@@ -1,0 +1,3 @@
+#pipeline enivronment definition
+export PERL5LIB=/g/data/xx92/vdp3.0:/g/data/xx92/vdp3.0/software/perl5/lib/perl5
+
