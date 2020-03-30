@@ -18,6 +18,8 @@ reads=/g/data/xx92/ma8803/reads
 work=/g/data/xx92/data/$version
 tools=/g/data/xx92/vdp3.0/software
 genome=/g/data/xx92/vdp3.0/GRCh38
+vep_index=$[directories]genome/vep_index
+vep_db=$[directories]genome/vep_db
 qsub=qsub
 run=run
 result=result
@@ -32,9 +34,47 @@ vqsr_known_sites_snp=$[directories]genome/$[references]gatkbundle/Homo_sapiens_a
 vqsr_known_sites_indel=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;$[directories]genome/$[references]gatkbundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz;$[directories]genome/$[references]gatkbundle/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz
 
 [targets]
+#calling regions in BED format:
 SureSelect_Clinical_Research_Exome_V2=$[directories]genome/targets/S30409818_Padded.bed
 WES=$[targets]SureSelect_Clinical_Research_Exome_V2
 WGS=$[directories]genome/targets/wgs.bed
+
+#regions in interval format to calculate picard Hybrid-selection 'CollectHsMetrics' statistics:
+hs_bait=$[directories]genome/targets/S30409818_Covered.interval
+hs_target=$[directories]genome/targets/S30409818_Regions_named.interval
+
+[tools]
+fastqc=$[directories]tools/FastQC/fastqc
+bwa=$[directories]tools/bwa-0.7.17/bwa
+picard=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/picard.jar
+samtools=$[directories]tools/samtools-1.10/samtools
+bedtools=$[directories]tools/bedtools2/bin/bedtools
+bcftools=$[directories]tools/bcftools-1.10.2/bcftools
+gatk=$[directories]tools/gatk-4.1.5.0/gatk
+varscan=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/VarScan.v2.4.4.jar
+peddy=export PYTHONPATH="\$PYTHONPATH:$[directories]tools/peddy"; python3.7 -m peddy
+
+[tool_versions]
+FastQC=$[tools]fastqc -v | cut -d ' ' -f 2
+BWA=$[tools]bwa 2>&1 | grep Version: | awk '{print \$2}'
+Picard=$[tools]picard MarkDuplicates --version 2>&1
+SamTools=$[tools]samtools 2>&1 | grep Version: | awk '{print \$2}'
+BedTools=$[tools]bedtools | grep Version: | awk '{print \$2}'
+BCFTools=$[tools]bcftools 2>&1 | grep Version: | awk '{print \$2}'
+GATK=$[tools]gatk --version 2>/dev/null | grep 'The Genome Analysis Toolkit' | awk '{print \$NF}'
+VarScan=$[tools]varscan 2>&1 | grep VarScan | head -n 1 | awk '{print \$2}'
+Strelka=echo '2.9.10'
+Ensembl_VEP=echo '99.2'
+peddy=$[tools]peddy --version 2>/dev/null | awk '{print \$NF}'
+
+[db_versions]
+Genome_Reference=Homo Sampiens GRCh38
+GATK_bundle=hg38/v0
+Ensembl_VEP=99_GRCh38
+GnomAD=3.0
+CADD=v1.5
+ClinVar=2020.03.10
+Cosmic=v90
 
 [split]
 01=split:1_21
@@ -112,13 +152,16 @@ intervals=chr16,chr17,chr19,chr20
 21:cohort=split:varscan_snp
 22:cohort=split:strelka
 23:cohort=split:merge_callers
+24:cohort=split:vep
+25:cohort=report_snv
+26:cohort=summary_report
 
 [step:fastqc]
 dir=fastqc
 pbs_queue=normal
-pbs_mem=1GB
+pbs_mem=2GB
 pbs_ncpus=2
-pbs_walltime=00:10:00
+pbs_walltime=00:30:00
 pbs_jobfs=10GB
 modules=java/jdk-13.33
 cmd_1=$[directories]pipeline/scripts/step_fastqc.pl
@@ -128,8 +171,8 @@ fastqc_bin=$[directories]tools/FastQC/fastqc
 dir=bwa
 pbs_queue=normal
 pbs_mem=32GB
-pbs_ncpus=16
-pbs_walltime=00:30:00
+pbs_ncpus=32
+pbs_walltime=08:00:00
 pbs_jobfs=200GB
 modules=java/jdk-13.33
 cmd_1=$[directories]pipeline/scripts/step_bwa.pl
@@ -150,8 +193,8 @@ dir=bam
 pbs_queue=normal
 pbs_mem=8GB
 pbs_ncpus=1
-pbs_walltime=00:10:00
-pbs_jobfs=200GB
+pbs_walltime=08:00:00
+pbs_jobfs=100GB
 modules=java/jdk-13.33
 cmd_1=$[directories]pipeline/scripts/step_mergebam.pl
 picard_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/picard.jar MergeSamFiles
@@ -159,9 +202,9 @@ picard_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION
 [step:target_merge]
 dir=bam
 pbs_queue=normal
-pbs_mem=4GB
+pbs_mem=1GB
 pbs_ncpus=1
-pbs_walltime=00:10:00
+pbs_walltime=00:30:00
 pbs_jobfs=100GB
 cmd_1=$[directories]pipeline/scripts/step_targetmerge.pl
 bedintersect_bin=$[directories]tools/bedtools2/bin/bedtools intersect
@@ -171,9 +214,9 @@ tabix_bin=$[directories]tools/htslib-1.10.2/tabix
 [step:mark_duplicates]
 dir=bam
 pbs_queue=normal
-pbs_mem=8GB
+pbs_mem=16GB
 pbs_ncpus=1
-pbs_walltime=00:10:00
+pbs_walltime=08:00:00
 pbs_jobfs=200GB
 modules=java/jdk-13.33
 cmd_1=$[directories]pipeline/scripts/step_markduplicates.pl
@@ -183,8 +226,8 @@ picard_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION
 dir=bqsr
 pbs_queue=normal
 pbs_mem=8GB
-pbs_ncpus=2
-pbs_walltime=00:10:00
+pbs_ncpus=4
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_bqsrrecal.pl
@@ -194,8 +237,8 @@ gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=
 dir=bqsr
 pbs_queue=normal
 pbs_mem=8GB
-pbs_ncpus=2
-pbs_walltime=00:10:00
+pbs_ncpus=1
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_bqsrgatherrep.pl
@@ -204,9 +247,9 @@ gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=
 [step:split:bqsr_apply]
 dir=bqsr
 pbs_queue=normal
-pbs_mem=8GB
-pbs_ncpus=2
-pbs_walltime=00:10:00
+pbs_mem=16GB
+pbs_ncpus=4
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_bqsrapply.pl
@@ -215,25 +258,22 @@ gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=
 [step:bqsr_gather_bam]
 dir=bam
 pbs_queue=normal
-pbs_mem=8GB
-pbs_ncpus=2
-pbs_walltime=00:10:00
+pbs_mem=16GB
+pbs_ncpus=8
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_bqsrgatherbam.pl
 picard_merge_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms2000m -jar $[directories]tools/picard.jar GatherBamFiles
 picard_sort_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/picard.jar SortSam
-#samtools_bin=$[directories]tools/samtools-1.10/samtools
-#incl_flags=PROPER_PAIR
-#excl_flags=UNMAP,MUNMAP,SECONDARY,QCFAIL,DUP,SUPPLEMENTARY
-#min_MQ=10
+picard_metrics_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/picard.jar CollectHsMetrics
 
 [step:split:filter_bam]
 dir=bam
 pbs_queue=normal
 pbs_mem=4GB
 pbs_ncpus=1
-pbs_walltime=00:10:00
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 cmd_1=$[directories]pipeline/scripts/step_filterbam.pl
 samtools_bin=$[directories]tools/samtools-1.10/samtools
@@ -246,7 +286,7 @@ dir=bam
 pbs_queue=normal
 pbs_mem=4GB
 pbs_ncpus=1
-pbs_walltime=00:10:00
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 cmd_1=$[directories]pipeline/scripts/step_mpileup.pl
 mpileup_bin=$[directories]tools/samtools-1.10/samtools mpileup
@@ -257,19 +297,20 @@ dir=gatk_haplotype_caller
 pbs_queue=normal
 pbs_mem=8GB
 pbs_ncpus=8
-pbs_walltime=00:30:00
+pbs_walltime=03:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkhaplotypecaller.pl
-gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true" HaplotypeCaller
+#gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true" HaplotypeCaller
+gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true" HaplotypeCaller
 read_filter_add=MateDifferentStrandReadFilter
 
 [step:split:gatk_combine_gvcfs]
 dir=gatk_haplotype_caller
 pbs_queue=normal
 pbs_mem=8GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_ncpus=1
+pbs_walltime=03:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkcombinegvcfs.pl
@@ -279,8 +320,8 @@ gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=
 dir=gatk_haplotype_caller
 pbs_queue=normal
 pbs_mem=16GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_ncpus=8
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkgenotypegvcfs.pl
@@ -291,19 +332,20 @@ dir=gatk_haplotype_caller
 pbs_queue=normal
 pbs_mem=16GB
 pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python,R/3.6.1
 cmd_1=$[directories]pipeline/scripts/step_gatkvqsr.pl --fun recal --mode INDEL
 gatk_bin=export R_LIBS_USER=$[directories]tools/R/3.6/lib; $[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms8g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-makeplots=false
+plots_bin=$[directories]pipeline/scripts/plot_Trenches.R
+makeplots=false #as per GATK we don't make tranches plot for indels
 
 #INDEL VQSR parameters:
-tranche=100.0,99.95,99.9,99.5,99.0,97.0,96.0,95.0,94.0,93.5,93.0,92.0,91.0,90.0
+tranche=100.0,99.9,99.0,90.0
 #DP should NOT by used for exomes, only for WGS
-#annotation=FS,ReadPosRankSum,MQRankSum,QD,SOR
+annotation=FS,ReadPosRankSum,MQRankSum,QD,SOR
 #annotation=FS,ReadPosRankSum,QD,SOR,DP
-annotation=QD,DP
+#annotation=QD,DP
 resources=dbsnp,known=true,training=false,truth=false,prior=2 $[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;mills,known=false,training=true,truth=true,prior=12 $[directories]genome/$[references]gatkbundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz;axiomPoly,known=false,training=true,truth=false,prior=10 $[directories]genome/$[references]gatkbundle/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz
 gauss=4,2,1
 
@@ -312,27 +354,28 @@ dir=gatk_haplotype_caller
 pbs_queue=normal
 pbs_mem=16GB
 pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python,R/3.6.1
 cmd_1=$[directories]pipeline/scripts/step_gatkvqsr.pl --fun recal --mode SNP
 gatk_bin=export R_LIBS_USER=$[directories]tools/R/3.6/lib; $[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms8g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-makeplots=false
+plots_bin=Rscript $[directories]pipeline/scripts/plot_Trenches.R
+makeplots=true
 
 #SNP VQSR parameters:
-tranche=100.0,99.95,99.9,99.8,99.6,99.5,99.4,99.3,99.0,98.0,97.0,90.0
+tranche=100.0,99.9,99.0,90.0
 #DP should NOT by used for exomes, only for WGS
-#annotation=QD,MQRankSum,ReadPosRankSum,FS,MQ,SOR
-annotation=QD,MQRankSum,ReadPosRankSum,FS,SOR,DP
+annotation=QD,MQRankSum,ReadPosRankSum,FS,MQ,SOR
+#annotation=QD,MQRankSum,ReadPosRankSum,FS,SOR,DP
 resources=dbsnp,known=true,training=false,truth=false,prior=7 $[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;hapmap,known=false,training=true,truth=true,prior=15 $[directories]genome/$[references]gatkbundle/hapmap_3.3.hg38.vcf.gz;omni,known=false,training=true,truth=true,prior=12 $[directories]genome/$[references]gatkbundle/1000G_omni2.5.hg38.vcf.gz;1000G,known=false,training=true,truth=false,prior=10 $[directories]genome/$[references]gatkbundle/1000G_phase1.snps.high_confidence.hg38.vcf.gz
 gauss=6,4,2,1
 
 [step:split:gatk_vqsr_apply_indel]
 dir=gatk_haplotype_caller
 pbs_queue=normal
-pbs_mem=16GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=04:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkvqsr.pl --fun apply --mode INDEL
@@ -344,9 +387,9 @@ filter_level=100
 [step:split:gatk_vqsr_apply_snp]
 dir=gatk_haplotype_caller
 pbs_queue=normal
-pbs_mem=16GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=04:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkvqsr.pl --fun apply --mode SNP
@@ -359,8 +402,8 @@ filter_level=100
 dir=varscan
 pbs_queue=normal
 pbs_mem=16GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_ncpus=8
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_varscan.pl --fun call --mode INDEL
@@ -372,14 +415,14 @@ min_coverage=8
 min_reads2=2
 min_avg_qual=15
 min_var_freq=0.01
-p_value=0.99
+p_value=0.1
 
 [step:split:varscan_snp]
 dir=varscan
 pbs_queue=normal
 pbs_mem=16GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_ncpus=8
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_varscan.pl --fun call --mode SNP
@@ -392,14 +435,14 @@ min_coverage=8
 min_reads2=5
 min_avg_qual=15
 min_var_freq=0.2
-p_value=0.99
+p_value=0.1
 
 [step:split:strelka]
 dir=strelka
 pbs_queue=normal
 pbs_mem=16GB
 pbs_ncpus=8
-pbs_walltime=00:30:00
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 modules=python2-as-python
 cmd_1=$[directories]pipeline/scripts/step_strelka.pl
@@ -414,10 +457,59 @@ tabix_bin=$[directories]tools/htslib-1.10.2/tabix
 dir=vcf
 pbs_queue=normal
 pbs_mem=4GB
-pbs_ncpus=2
-pbs_walltime=00:30:00
+pbs_ncpus=1
+pbs_walltime=08:00:00
 pbs_jobfs=100GB
 cmd_1=$[directories]pipeline/scripts/step_mergecallers.pl
 bcftools_bin=$[directories]tools/bcftools-1.10.2/bcftools
 bgzip_bin=$[directories]tools/htslib-1.10.2/bgzip
 tabix_bin=$[directories]tools/htslib-1.10.2/tabix
+
+[step:split:vep]
+dir=vcf
+pbs_queue=normal
+pbs_mem=8GB
+pbs_ncpus=2
+pbs_walltime=08:00:00
+pbs_jobfs=100GB
+cmd_1=$[directories]pipeline/scripts/step_vep.pl
+vep_bin=$[directories]tools/ensembl-vep-release-99.2/vep
+bcftools_bin=$[directories]tools/bcftools-1.10.2/bcftools
+bgzip_bin=$[directories]tools/htslib-1.10.2/bgzip
+tabix_bin=$[directories]tools/htslib-1.10.2/tabix
+gnomad_vcf=$[directories]vep_db/gnomad.genomes.r3.0.sites.vcf.bgz
+clinvar_vcf=$[directories]vep_db/clinvar_20200310.vcf.gz
+cosmic_coding_vcf=$[directories]vep_db/CosmicCodingMuts.vcf.gz
+cosmic_noncoding_vcf=$[directories]vep_db/CosmicNonCodingVariants.vcf.gz
+cad=$[directories]vep_db/whole_genome_SNVs.tsv.gz
+fasta=$[directories]vep_db//Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz
+
+[step:report_snv]
+dir=vcf
+pbs_queue=normal
+pbs_mem=16GB
+pbs_ncpus=2
+pbs_walltime=08:00:00
+pbs_jobfs=100GB
+modules=java/jdk-13.33,python3-as-python,python3/3.7.4,R/3.6.1
+cmd_1=$[directories]pipeline/scripts/step_reportsnv.pl
+bgzip_bin=$[directories]tools/htslib-1.10.2/bgzip
+tabix_bin=$[directories]tools/htslib-1.10.2/tabix
+picard_bin=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms2000m -jar $[directories]tools/picard.jar
+gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms8g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+peddy_bin=export PYTHONPATH="\$PYTHONPATH:$[directories]tools/peddy"; echo \$PYTHONPATH; python3.7 -m peddy
+pcaplot_bin=Rscript $[directories]pipeline/scripts/plot_PopulationPCA.R
+peddy_dir=peddy
+dbsnp=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf
+
+filter_rd_cvr = 5
+
+[step:summary_report]
+dir=report
+pbs_queue=normal
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=01:00:00
+pbs_jobfs=100GB
+modules=java/jdk-13.33,python3-as-python,python3/3.7.4,R/3.6.1
+cmd_1=$[directories]pipeline/scripts/step_summaryreport.pl

@@ -103,7 +103,7 @@ modules::Exception->throw("Can't access cohort run directory $dir_gvcfs") if(!-d
 my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 
@@ -130,7 +130,8 @@ sub recal{
 	my $annotation  = $Config->read("step:$step", "annotation");
 	my $resources   = $Config->read("step:$step", "resources");
 	my $gauss       = $Config->read("step:$step", "gauss");
-	my $rscript     = $Config->read("step:$step", "makeplots") eq 'true'? "--rscript-file $cohort.$mode.R": "";
+	my $makeplots   = $Config->read("step:$step", "makeplots");
+	my $plots_bin   = $Config->read("step:$step", "plots_bin");
 	
 	$tranche    = ",$tranche";
 	$annotation = ",$annotation";
@@ -154,7 +155,7 @@ sub recal{
 	foreach my $g(@gausses){
 		warn "running with --max-gaussians $g\n";
 		my $cmd = $Config->read("step:$step", "gatk_bin");
-		my $cmdx = " VariantRecalibrator -mode $mode --tmp-dir $dir_tmp -R $reference -L $regions $tranche $annotation $resources --max-gaussians $g --trust-all-polymorphic -V ".join(" -V ", @files)." $rscript --tranches-file $dir_run/$cohort.$mode.tranches -O $dir_run/$cohort.$mode.recall.vcf.gz";
+		my $cmdx = " VariantRecalibrator -mode $mode --tmp-dir $dir_tmp -R $reference -L $regions $tranche $annotation $resources --max-gaussians $g --trust-all-polymorphic -V ".join(" -V ", @files)." --tranches-file $dir_run/$cohort.$mode.tranches -O $dir_run/$cohort.$mode.recall.vcf.gz";
 		$cmdx =~ s/\s+-/ \\\n  -/g;
 		$cmd .= $cmdx;
 		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
@@ -167,6 +168,11 @@ sub recal{
 		}
 	}
 	exit(1) if($r); #exit with $r would be tricky as bash sees only 8 bits, instead of converting we just return 1
+	if($makeplots eq 'true'){
+		my $cmd = "$plots_bin $dir_run/$cohort.$mode.tranches";
+		$r = $Syscall->run($cmd, 1);
+		exit(1) if($r);
+	}
 }#recal
 
 

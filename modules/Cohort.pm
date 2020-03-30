@@ -69,6 +69,9 @@ sub make_workdir{
 	#	warn "removing existing working directory '$dir_work/$cohort'\n";
 	#	remove_tree("$dir_work/$cohort");
 	#}
+	my $username = `getent passwd \$(whoami) | cut -d : -f 1,5`;
+	chomp $username;
+	my $tstamp = modules::Utils::get_time_stamp;
 	make_path("$dir_work/$cohort/$dir_qsub");
 	make_path("$dir_work/$cohort/$dir_run");
 	make_path("$dir_work/$cohort/$dir_run/$dir_tmp");
@@ -79,12 +82,17 @@ sub make_workdir{
 	$config->reload("$dir_work/$cohort/$cfn");
 	$self->config->file_append("\n#".('*'x20)." Cohort $cohort configuration ".('*'x20));
 	$self->config->file_append("[cohort]");
-	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort");
+	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort\nusername=$username\ntime_start=$tstamp");
 	$config->reload("$dir_work/$cohort/$cfn");
-	#copy PED file
+	#copy PEDX file and make regular PED file:
 	($cfn, $cdir) = fileparse($self->ped->file_name);
 	cp($self->ped->file_name, "$dir_work/$cohort/$cfn") or modules::Exception->throw($!);
 	$self->ped->reload("$dir_work/$cohort/$cfn");
+	modules::Exception->throw("the cohort extended PED file has to have '.pedx' extension") if($cfn !~ /\.pedx$/);
+	$cfn =~ s/\.pedx/\.ped/;
+	open O, ">$dir_work/$cohort/$cfn" or modules::Exception->throw("Can't open: '$dir_work/$cohort/$cfn' for writing");
+	print O $self->ped->ped_string;
+	close O;
 }#make_workdir
 
 sub load_ped{

@@ -92,7 +92,7 @@ my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 my $readfiles = $Config->read($individual, "reads:$readfile");
 $readfiles =~ s/,/ /g;
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 
@@ -108,8 +108,27 @@ my $ncpu = $Config->read("step:$step", "pbs_ncpus");
 $cmd .= " --quiet --threads $ncpu --dir $dir_run --nogroup --extract --outdir $dir_run $readfiles";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);
+#my $r = 0;
+exit(1) if($r);
 
-exit(1) if($r); #exit with $r would be tricky as bash sees only 8 bits, instead of converting we just return 1
+my @rd = split " ", $readfiles;
+$rd[0] = basename($rd[0]);
+$rd[1] = basename($rd[1]);
+$rd[0] =~ s/\.f(ast)?q(.gz)?/_fastqc/;
+$rd[1] =~ s/\.f(ast)?q(.gz)?/_fastqc/;
+my $sum0  = "$dir_run/$rd[0]/summary.txt";
+my $sum1  = "$dir_run/$rd[1]/summary.txt";
+my $data0 = "$dir_run/$rd[0]/fastqc_data.txt";
+my $data1 = "$dir_run/$rd[1]/fastqc_data.txt";
+
+$cmd = "paste $data0 $data1 | head -n 11 | grep -P \"(^Total)|(^Sequence length)|(^%GC)\" | awk 'BEGIN{FS=\"\\t\"; OFS=FS}{print \$1,\$2,\$4}' >$dir_run/$readfile.summary.txt";
+$r = $Syscall->run($cmd, 1);
+exit(1) if($r && $r != 36096); #the 36096 is actually err 141 caused by head terminating pipe after reading 11 lines
+
+$cmd = "paste $sum0 $sum1 | awk 'BEGIN{FS=\"\\t\"; OFS=FS}{print \$2,\$1,\$4}' >>$dir_run/$readfile.summary.txt";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
 exit(0);
 
 END{

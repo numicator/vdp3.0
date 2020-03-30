@@ -6,6 +6,8 @@ ApplyVQSR may NOT be done on slplits. e.g. here: https://gatkforums.broadinstitu
 https://gatk.broadinstitute.org/hc/en-us/articles/360035531112?id=2806 - crucial read on GATK variant filtering
 http://www.ensembl.info/2018/06/22/cool-stuff-the-vep-can-do-normalisation/
 
+while :; do ps -Ao %cpu,%mem|tail -n +1|awk 'BEGIN{cpu=0;mem=0} {cpu+=$1;mem+=$2} END{print cpu, mem}'; sleep 2; done &
+
 #BWA
 #https://github.com/lh3/bwa/releases
 wget wget https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2
@@ -74,6 +76,11 @@ cpanm JSON
 cpanm PerlIO::gzip
 cpanm Try::Tiny
 
+cpanm Module::Install
+cpanm PDF::API2
+cpanm PDF::API2::Simple
+cpanm PDF::Table
+
 #installation script will need to have bgzip and tabix in search path
 ./INSTALL.pl --CACHEDIR /g/data/xx92/vdp3.0/GRCh38/vep_index/ --CONVERT --CACHEURL /g/data/xx92/vdp3.0/software/homo_sapiens/ --FASTAURL /g/data/xx92/vdp3.0/software/homo_sapiens/
 
@@ -120,6 +127,42 @@ curl failed (000), trying to fetch using LWP::Simple
 - add "--plugin miRNA" to your VEP command to use this plugin
 - OK
 
+Plugins data:
+mkdir /g/data/xx92/vdp3.0/GRCh38/vep_db
+cd /g/data/xx92/vdp3.0/GRCh38/vep_db
+
+CADD: 
+wget https://krishna.gs.washington.edu/download/CADD/v1.5/GRCh38/whole_genome_SNVs.tsv.gz
+wget https://krishna.gs.washington.edu/download/CADD/v1.5/GRCh38/whole_genome_SNVs.tsv.gz.tbi
+
+ClinVar:
+wget ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar_20200310.vcf.gz
+wget ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar_20200310.vcf.gz.tbi
+
+gnomAD:
+
+hash=$(echo "marcin.adamski@anu.edu.au:Marcin00#" | base64); curl -H "Authorization: Basic $hash" https://cancer.sanger.ac.uk/cosmic/file_download/GRCh38/cosmic/v90/VCF/CosmicCodingMuts.vcf.gz | awk -F ":" '{printf("%s:%s",$2,substr($3, 1, length($3)-1))}'
+hash=$(echo "marcin.adamski@anu.edu.au:Marcin00#" | base64); curl -H "Authorization: Basic $hash" https://cancer.sanger.ac.uk/cosmic/file_download/GRCh38/cosmic/v90/VCF/CosmicNonCodingVariants.vcf.gz | awk -F ":" '{printf("%s:%s",$2,substr($3, 1, length($3)-1))}'
+
+#PEDDY
+module load python3/3.7.4
+cd <software>
+mkdir pythonlib
+export PYTHONPATH=<software>/pythonlib/lib/python3.7/site-packages:<software>/peddy"
+export PATH="<software>/pythonlib/bin:$PATH"
+pip3.7 install --prefix=/g/data/xx92/vdp3.0/software/pythonlib cyvcf2 pytz networkx pandas scikit-learn toolshed click coloredlogs seaborn
+git clone https://github.com/brentp/peddy
+cd peddy
+pip3.7 install --prefix=/g/data/xx92/vdp3.0/software/pythonlib --editable .
+#to check:
+python3.7 -m peddy -p 4 --plot --prefix ceph-1463 data/ceph1463.peddy.vcf.gz data/ceph1463.ped
+#there is an issue in curent peddy:
+File "peddy/peddy/cli.py", line 105, in correct_sex_errors
+  osc[sel] = ito
+IndexError: arrays used as indices must be of integer (or boolean) type
+To fix:
+cli.py line 104 from sel = (gt & sf & (sc == ifrom)) to: sel = (gt & sf & (sc == ifrom)) != 0
+
 #target bed's for targeted sequencing - all sequencing is targeted, only for WGS chromosomes are the targets
 #Agilen WES target (padded) bed file
 https://earray.chem.agilent.com/suredesign/search.htm
@@ -127,6 +170,10 @@ https://earray.chem.agilent.com/suredesign/search.htm
 #select 'SureSelect Clinical Research Exome V2' from 'Agilent Catalog'
 #choose hg38, click 'download'
 #choose S30409818_Padded.bed
+#make exon regions for calculating exon coverage:
+bedtools intersect -a S30409818_Regions.bed -b S30409818_Padded.bed -wa -wb | cut -f1-3,7 | bedtools merge -i - -c 4 -o distinct  | sed "s/-,//" | sed "s/,-//" | awk '{if($3 - $2 > 3) print}' >S30409818_Regions_named.bed
+java -jar ../../software/picard.jar BedToIntervalList I=S30409818_Regions_named.bed O=S30409818_Regions_named.interval SD=../GATK_bundle_v0/Homo_sapiens_assembly38.dict
+
 #'fake' wgs.bed for WGS sequencing:
 chr1	0	999999999
 chr2	0	999999999

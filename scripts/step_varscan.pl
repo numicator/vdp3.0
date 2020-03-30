@@ -105,7 +105,7 @@ modules::Exception->throw("Can't access call regions file $regions") if(!-e $reg
 my $samples = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/samples.txt';
 modules::Exception->throw("Can't access samples list file $samples") if(!-e $samples);
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 

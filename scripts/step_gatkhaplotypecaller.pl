@@ -100,7 +100,7 @@ modules::Exception->throw("Can't access call regions file $regions") if(!-e $reg
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 #my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
@@ -116,7 +116,7 @@ my $read_filter = $Config->read("step:$step", "read_filter_add");
 $read_filter = ",$read_filter";
 $read_filter =~ s/[,;]/ -RF /g;
 
-my $cmdx .= " --tmp-dir $dir_tmp -R $reference $read_filter --interval-set-rule INTERSECTION -L $regions -L $split_bed -ERC GVCF -contamination 0 -GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90 -G StandardAnnotation -G StandardHCAnnotation -G AS_StandardAnnotation -I $dir_gather/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.$split.g.vcf.gz";
+my $cmdx .= " --tmp-dir $dir_tmp -R $reference $read_filter --max-alternate-alleles 3 --interval-set-rule INTERSECTION -L $regions -L $split_bed -ERC GVCF -contamination 0 -GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90 -G StandardAnnotation -G StandardHCAnnotation -G AS_StandardAnnotation -I $dir_gather/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.$split.g.vcf.gz";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);

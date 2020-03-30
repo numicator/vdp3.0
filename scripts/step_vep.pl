@@ -94,7 +94,7 @@ modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 #my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
@@ -109,13 +109,16 @@ my $bcftools_bin = $Config->read("step:$step", "bcftools_bin");
 my $tabix_bin = $Config->read("step:$step", "tabix_bin");
 my $cmdx;
 
+warn " *************** UNCOMMENT BCFTOOLS, VEP and TABIX *********************\n";
+
+my $r;
 #we need to split multi allelic loci loci and remove possibly duplicates
 #command below will work only if vcf header is 4.2 - AD field must be defined as Number=R, not Number=. or Number=1
 #GATK generates it OK, Strelka and Varscan not. But if the vcf merge between callers in the previous step was done with GATK being the first, the Number=R
 #otherwise it would be necessary to manualy fix the AD field def. in the VCF header 
 my $cmd = "$bcftools_bin norm -m -both $dir_run/$cohort.$split.vcf.gz | $bcftools_bin norm -d none -O v -o $dir_run/$cohort.$split.vep_in.vcf";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
+#$r = $Syscall->run($cmd);
 exit(1) if($r);
 
 my $index_dir    = $Config->read("directories", "vep_index");
@@ -134,12 +137,12 @@ $cmd =~ s/\s+-/ \\\n  -/g;
 $cmd = "$vep_bin $cmd";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 warn "running Ensembl VEP...\n";
-$r = $Syscall->run($cmd);
+#$r = $Syscall->run($cmd);
 warn "finished Ensembl VEP\n";
 exit(1) if($r);
 
 $cmd = "$tabix_bin -f $dir_run/$cohort.$split.vep.vcf.gz";
-$r = $Syscall->run($cmd);
+#$r = $Syscall->run($cmd);
 exit(1) if($r);
 
 open I, "$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|" or modules::Exception->throw("Can't do: '$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|'");
@@ -170,12 +173,15 @@ while(<I>){
 			$sampcln{$a[$i]} = $i;
 			#warn "  $a[$i] = $i\n";
 		}
-		print O "chr\tpos\tref\talt";
+		print O "chr\tpos\tref\talt\tRD\tAD0\tAD1";
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-GT";
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-GQ";
+		}
+		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
+			print O "\t$_-RD";
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-AD0";
@@ -208,7 +214,7 @@ while(<I>){
 			@adp = split ',', $a[$frmtag{AD}];
 		}
 		else{ #varscan reports AD as a single value for variant and RD with value for reference
-			modules::Exception->throw("tag AD has only a single value and tag RD is missing in VCF file line $.") if(!defined $frmtag{RD});
+			modules::Exception->throw("tag AD has only a single value (for the variant) and tag RD (for the ref.) is missing in VCF file line $.") if(!defined $frmtag{RD});
 			@adp = ($a[$frmtag{RD}], $a[$frmtag{AD}]);
 		}
 		push @ad0, $adp[0];
@@ -230,13 +236,29 @@ while(<I>){
 		$csqs[$i] =~ s/\&/,/g;
 		my @a = split "\t", $csqs[$i];
 		if(defined $a[$vepfld{PICK}] && $a[$vepfld{PICK}] ne '' && $a[$vepfld{PICK}] == 1){
-			print O join("\t", $fld[0], $fld[1], $fld[3], $fld[4])."\t".join("\t", @gt)."\t".join("\t", @gq)."\t".join("\t", @ad0)."\t".join("\t", @ad1)."\t$caller\t$vqslod\t$mq";
-			print O "\t$csqs[$i]\n";
+			my(@rds, $rd, $ad0, $ad1); #global stats for the variant accross all samples
+			for(my $i = 0; $i < scalar @ad0; $i++){
+				my $a0 = $ad0[$i] eq '.'? 0: $ad0[$i];
+				my $a1 = $ad1[$i] eq '.'? 0: $ad1[$i];
+				$rds[$i] = $a0 + $a1;
+				$ad0 += $a0;
+				$ad1 += $a1;
+				$rd  += $a0 + $a1;
+			}
+			if($rd > 0){ #in some multiallelic cases strelka reports variants with 0 read support for the allele (facepalm)
+				print O join("\t", $fld[0], $fld[1], $fld[3], $fld[4])."\t$rd\t$ad0\t$ad1\t".join("\t", @gt)."\t".join("\t", @gq)."\t".join("\t", @rds)."\t".join("\t", @ad0)."\t".join("\t", @ad1)."\t$caller\t$vqslod\t$mq";
+				print O "\t$csqs[$i]\n";
+			}
+			else{
+				warn "WARN: read depth filter dropped variant $fld[0]:$fld[1] $fld[3]/$fld[4] with RD = $rd caller = $caller\n";
+			}
 		}
 	}
 }
 close O;
 close I;
+
+unlink("$dir_run/$cohort.$split.vep_in.vcf"); #lets skip any error control on this one ;)
 
 exit(0);
 

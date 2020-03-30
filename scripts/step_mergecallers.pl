@@ -105,7 +105,7 @@ modules::Exception->throw("Can't access cohort run directory $dir_strelka") if(!
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 #my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
@@ -173,13 +173,21 @@ END{
 sub annotate{
 	my($str_in, $fout, $caller) = @_;
 	
-	#I couldn't find a way to do such a simple annotation with bcftools or picard, so wrote this to add tag 'caller' to the INFO column:
+	#I couldn't find a way to do such a simple annotation with bcftools or picard, so wrote this to add tag 'caller' to the INFO column
+	#it does a few fixes to a bit sloppy job done by bcftools isec
 	open I, "$str_in" or modules::Exception->throw("Can't do: '$str_in'");
 	open O, "|$bgzip_bin -c >$fout" or modules::Exception->throw("Can't do: '|$bgzip_bin -c >$fout'");
-	my $info = 7; #index of the INFO column
+	my $info = 7;    #index of the INFO column
+	my $format =  8; #index of the FORMAT column
+	
 	my $head_info_line;
 	my $head_info_added;
 	while(<I>){
+		
+		if(/^##/){ #fixes to the VCF header ommited by bcftools
+			s/##FORMAT=<ID=SB,Number=4,Type=Integer,/##FORMAT=<ID=SB,Number=4,Type=Float,/;
+			s/##FORMAT=<ID=AD,Number=.,/##FORMAT=<ID=AD,Number=R,/;
+		}
 		if(/^##INFO=/){
 			$head_info_line = $.;
 			print O $_;
@@ -199,6 +207,30 @@ sub annotate{
 		#here we get the real records:
 		my @fld = split "\t";
 		$fld[$info] = "caller=$caller;$fld[$info]";
+		
+		#varscan reports allele coverage with two separate tags RD and AD not with two values in AD. 
+		#We need to fix it or our report generating code will break (and we have inconsistency in final VCF):
+		# for some weird reason bcftools doesn't like VCF with this mod when performing normalization in the next, vep step.
+		# gave up and fixed this issue in vep step during tsv report generation
+		#		if($caller eq "varscan"){
+		#			my @tg = split ":", $fld[$format];
+		#			my $rdi;
+		#			my $adi;
+		#			for(my $i = 0; $i < scalar @tg; $i++){
+		#				$rdi = $i if($tg[$i] eq 'RD');
+		#				$adi = $i if($tg[$i] eq 'AD');
+		#			}
+		#			print STDERR "$caller\n";
+		#			print STDERR "$fld[$format]\n";
+		#			for(my $i = $format + 1; $i < scalar @fld; $i++){
+		#				print STDERR "$fld[$i] => ";
+		#				my @vl = split ":", $fld[$i];
+		#				die "did not expect to find ',' in $vl[$adi]\n" if($vl[$adi] =~ /,/);
+		#				$vl[$adi] = "$vl[$rdi],$vl[$adi]";
+		#				$fld[$i] = join(':', @vl);
+		#				print STDERR "$fld[$i]\n";
+		#			}
+		#		}
 		print O join("\t", @fld);
 	}
 	close O;

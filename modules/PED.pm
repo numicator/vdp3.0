@@ -58,6 +58,18 @@ sub _load{
 	return \%ped_data;
 }#_load
 
+sub ped_string{
+	my($self) = shift;
+	my $str;
+	foreach my $fam(sort keys %{$self->ped}){
+		foreach my $indv(sort keys %{$self->ped->{$fam}}){
+			$str .= "$fam\t$indv\t".$self->ped->{$fam}{$indv}{father}."\t".$self->ped->{$fam}{$indv}{mother}."\t".$self->ped->{$fam}{$indv}{sex}."\t".$self->ped->{$fam}{$indv}{phenotype}."\n"
+		}
+	}
+	#warn "PED:\n$str\n";
+	return $str;
+}#ped_string
+
 #Get ped data from a file
 sub ped{
 	my($self) = shift;

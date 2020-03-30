@@ -105,7 +105,7 @@ foreach(sort keys %{$Config->read("split")}){
 	push @files, $f;
 }
 
-my $PED = modules::PED->new("$dir_cohort/$cohort.ped");
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 #my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
@@ -114,13 +114,24 @@ modules::Exception->throw("cohort id submited as argument is not the same as coh
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
+my $reference     = $Config->read("references", "genome_fasta");
+my $region_bait   = $Config->read("targets", "hs_bait");
+my $region_target = $Config->read("targets", "hs_target");
+
 my $cmd_m = $Config->read("step:$step", "picard_merge_bin");
 my $cmd_s = $Config->read("step:$step", "picard_sort_bin");
+my $cmd_x = $Config->read("step:$step", "picard_metrics_bin");
 
 my $cmd = "$cmd_m INPUT=".join(" INPUT=", @files)." OUTPUT=/dev/stdout | $cmd_s MAX_RECORDS_IN_RAM=300000 INPUT=/dev/stdin OUTPUT=$dir_run/$cohort-$individual.bqsr.bam SORT_ORDER=coordinate CREATE_INDEX=true";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
+#my $r = $Syscall->run($cmd);
+my $r;
 exit(1) if($r);
+
+$cmd = "$cmd_x TMP_DIR=$dir_tmp I=$dir_run/$cohort-$individual.bqsr.bam O=$dir_run/$cohort-$individual.bammetrics.txt R=$reference BAIT_INTERVALS=$region_bait TARGET_INTERVALS=$region_target PER_TARGET_COVERAGE=$dir_run/$cohort-$individual.exon_cover.tsv";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
 exit(0);
 
 END{
