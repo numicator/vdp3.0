@@ -44,6 +44,36 @@ sub pipesteps{
 	return $self->{pipesteps};
 }#pipesteps
 
+sub workdir{
+	my($self) = shift;
+	return $self->config->read("directories", "work").'/'.$self->id
+}#workdir
+
+sub has_completed{
+	my($self) = shift;
+	my $r = 0;
+	my $file = $self->workdir.'/'.$self->id.'.done';
+	$r = 1 if(-s $file);
+	return $r;
+}#is_completed
+
+sub set_completed{
+	my($self) = shift;
+	my $file  = $self->workdir.'/'.$self->id.'.done';
+	my $ts    = modules::Utils::get_time_stamp;
+	open O, ">$file" or modules::Exception->throw("Can't open $file for writing\n");
+	print O $ts;
+	close O;
+	warn 'cohort '.$self->id." set complete marker file\n";
+}#set_completed
+
+sub reset_completed{
+	my($self) = shift;
+	my $file  = $self->workdir.'/'.$self->id.'.done';
+	unlink($file) or modules::Exception->throw("Can't unlink $file\n");
+	warn 'cohort '.$self->id." reset complete marker file\n";
+}#reset_completed
+
 sub make_workdir{
 	my($self, $overwrite) = @_;
 	
@@ -69,8 +99,7 @@ sub make_workdir{
 	#	warn "removing existing working directory '$dir_work/$cohort'\n";
 	#	remove_tree("$dir_work/$cohort");
 	#}
-	my $username = `getent passwd \$(whoami) | cut -d : -f 1,5`;
-	chomp $username;
+	my $username = modules::Utils::username;
 	my $tstamp = modules::Utils::get_time_stamp;
 	make_path("$dir_work/$cohort/$dir_qsub");
 	make_path("$dir_work/$cohort/$dir_run");

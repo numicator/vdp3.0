@@ -109,7 +109,7 @@ my $bcftools_bin = $Config->read("step:$step", "bcftools_bin");
 my $tabix_bin = $Config->read("step:$step", "tabix_bin");
 my $cmdx;
 
-warn " *************** UNCOMMENT BCFTOOLS, VEP and TABIX *********************\n";
+#warn " *************** UNCOMMENT BCFTOOLS, VEP and TABIX *********************\n";
 
 my $r;
 #we need to split multi allelic loci loci and remove possibly duplicates
@@ -118,7 +118,7 @@ my $r;
 #otherwise it would be necessary to manualy fix the AD field def. in the VCF header 
 my $cmd = "$bcftools_bin norm -m -both $dir_run/$cohort.$split.vcf.gz | $bcftools_bin norm -d none -O v -o $dir_run/$cohort.$split.vep_in.vcf";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-#$r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
 
 my $index_dir    = $Config->read("directories", "vep_index");
@@ -137,12 +137,12 @@ $cmd =~ s/\s+-/ \\\n  -/g;
 $cmd = "$vep_bin $cmd";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 warn "running Ensembl VEP...\n";
-#$r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 warn "finished Ensembl VEP\n";
 exit(1) if($r);
 
 $cmd = "$tabix_bin -f $dir_run/$cohort.$split.vep.vcf.gz";
-#$r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
 
 open I, "$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|" or modules::Exception->throw("Can't do: '$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|'");

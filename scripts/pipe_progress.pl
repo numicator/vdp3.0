@@ -75,6 +75,8 @@ my $codebase    = $Config->read("directories", "pipeline");
 my $dir_cohorts = $Config->read("directories", "work");
 warn "pipeline version: '$pversion', codebase: '$codebase'\n";
 
+my $user_current = modules::Utils::username;
+
 my @cohorts;
 if(!defined $OPT{cohort}){
 	push @cohorts, modules::Utils::get_cohorts($dir_cohorts, 'in_progress');
@@ -86,6 +88,9 @@ else{
 	push @cohorts, $OPT{cohort};
 }
 
+my $Pipeline = modules::Pipeline->new();
+$Pipeline->get_qjobs;
+
 foreach my $cohort(@cohorts){
 	my $dir_cohort .= "$dir_cohorts/$cohort";
 	warn "progressing cohort '$cohort'\n";
@@ -94,14 +99,21 @@ foreach my $cohort(@cohorts){
 	#warn "cohort read directory: $dir_cohort\n";
 	my $Config = modules::Config->new("$dir_cohort/pipeline.cnf");
 	modules::Exception->throw("Cohort directory '$dir_cohort' is not the same as '".$Config->read("cohort", "dir")."' in $dir_cohort/pipeline.cnf, section '[cohort]', value 'dir'") if($Config->read("cohort", "dir") !~ /$dir_cohort\/?/);
-
+	
+	my $username = $Config->read("cohort", "username");
+	if($user_current ne $username){
+		warn "cohort '$cohort' belongs to user '$username', not me '$user_current', skipping\n";
+		next;
+	}
+	
 	my $smp_name = basename(__FILE__);
 	$smp_name =~ s/\.pl$//;
 	$smp_name = "$dir_cohort/$smp_name";
+	
 	my $Semaphore = modules::Semaphore->new($smp_name);
 	$smp_name = $Semaphore->file_name;
 	if(! $Semaphore->lock){
-		warn "Couldn't apply lock to semaphore file '$smp_name' meaning another ".basename(__FILE__)." is curently running on cohort $cohort; backing off\n";
+		warn "couldn't apply lock to semaphore file '$smp_name' meaning another ".basename(__FILE__)." is curently running on cohort $cohort; backing off\n";
 		next;
 	}
 	
@@ -110,11 +122,15 @@ foreach my $cohort(@cohorts){
 	modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 
 	my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+	if($Cohort->has_completed){
+		warn "cohort '$cohort' has already completed the pipeline\n";
+		next;
+	}
 	$Cohort->add_individuals_ped();
-
-	my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
+	#my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
+	$Pipeline->set_cohort(cohort => $Cohort);
 	$Pipeline->get_pipesteps;
-	$Pipeline->get_qjobs;
+	#$Pipeline->get_qjobs;
 	warn "running Pipeline->check_current_step('".(defined $OPT{step}? $OPT{step}: '')."')\n";
 	my($step_completed, $step_next) = $Pipeline->check_current_step($OPT{step});
 	$Pipeline->submit_step($step_next) if(defined $step_next);

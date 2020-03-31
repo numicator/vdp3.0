@@ -51,14 +51,16 @@ sub file_name{
 }#file_name
 
 sub lock{
-	my($self) = shift;
+	my($self, $non_blocking) = shift;
 	my $ret = 0;
+	
+	$non_blocking = !defined $non_blocking || $non_blocking != 0? LOCK_NB: 0;
 	
 	if(flock($self->fh, LOCK_EX | LOCK_NB)){
 		warn basename($self->file_name)." locked all right\n";
 		#print $fh POSIX::strftime("%d-%m-%Y_%H:%M:%S", localtime)."\tLOCK\t".(defined $ENV{'PBS_JOBID'}?$ENV{'PBS_JOBID'}: 'NOT_PBS')."\t".hostname()."\n";
 		my $fh = $self->fh;
-		print $fh "".modules::Utils::get_time_stamp()."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\n";
+		print $fh "".modules::Utils::get_time_stamp."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\n";
 		$ret = 1;
 	}
 	else{

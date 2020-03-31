@@ -32,6 +32,13 @@ sub hostname{
 	return $1;
 }#hostname
 
+sub username{
+	my($self) = shift;
+	my $username = `getent passwd \$(whoami) | cut -d : -f 1,5`;
+	chomp $username;
+	return $username;
+}#username
+
 sub median() {
     my ($self, $ra_values) = @_;
 

@@ -11,8 +11,10 @@ sub new
 	my ($class, @args) = @_;
 	my $self = bless {}, $class;
 	my %args = @args;
-	$self->{cohort} = $args{cohort};
-	$self->{config} = $self->cohort->config;
+	if($args{cohort}){
+		$self->{cohort} = $args{cohort};
+		$self->{config} = $self->cohort->config;
+	}
 	return $self;
 }
 
@@ -30,6 +32,14 @@ sub pipesteps{
 	my($self) = shift;
 	return $self->{pipesteps};
 }#pipesteps
+
+sub set_cohort{
+	my($self, @args) = @_;
+	my %args = @args;
+	undef $self->{pipesteps};
+	$self->{cohort} = $args{cohort};
+	$self->{config} = $self->cohort->config;
+}#set_cohort
 
 sub get_pipesteps{
 	my($self) = shift;
@@ -72,38 +82,6 @@ sub make_qsubs{
 		}
 	}
 }#make_qsubs
-
-#sub pipe_start{
-#	my($self) = shift;
-#
-#	my @s;
-#	my $step_start;
-#	foreach my $step(@{$self->pipesteps}){
-#		$step->[0] =~ /^(\d+):(\w+)/;
-#		last if(defined $step_start && $step_start < $1);
-#		$step_start = $1;
-#		
-#		if($2 eq 'cohort'){
-#			push @s, $self->cohort->pipestep($step->[1])
-#		}
-#		elsif($2 eq 'individual'){
-#			foreach(@{$self->cohort->individual}){
-#				push @s, $_->pipestep($step->[1]);
-#			}
-#		}
-#		elsif($2 eq 'readfile'){
-#			foreach(@{$self->cohort->individual}){
-#				push @s, $_->readfiles->pipestep($step->[1]);
-#			}
-#		}
-#	}
-#	warn "submitting jobs:\n";
-#	foreach my $ss(@s){
-#		foreach(@{$ss}){
-#			warn "  qsub $_\n";
-#		}
-#	}
-#}#pipe_start
 
 sub submit_step{
 	my($self, $step) = @_;
@@ -211,6 +189,7 @@ sub check_current_step{
 	$stc = $pipesteps->[$step_completed][0] if(defined $step_completed);
 	if($step_next == -1){
 		warn "no more steps to run, pipeline finished\n";
+		$self->cohort->set_completed if(! $self->cohort->has_completed);
 		return($stc, $stn);
 	}
 	if(defined $step_current){ #we were given $step_current meaning we are being called from a finishing qsub, we should not run anything from $step_current to avoid racing
