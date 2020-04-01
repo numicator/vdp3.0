@@ -4,6 +4,7 @@ use strict;
 use File::Basename;
 use modules::Definitions;
 use modules::Exception;
+use modules::Semaphore;
 use Data::Dumper;
 
 sub new  
@@ -11,10 +12,16 @@ sub new
 	my ($class, @args) = @_;
 	my $self = bless {}, $class;
 	my %args = @args;
+	if($args{config}){
+		$self->{config} = $args{config};
+	}
 	if($args{cohort}){
 		$self->{cohort} = $args{cohort};
 		$self->{config} = $self->cohort->config;
 	}
+	my $pversion    = $self->config->read("global", "version");
+	my $dir_cohorts = $self->config->read("directories", "work");
+	$self->{dbfile} = "$dir_cohorts/$pversion.db";
 	return $self;
 }
 
@@ -28,6 +35,11 @@ sub cohort{
 	return $self->{cohort};
 }#cohort
 
+sub dbfile{
+	my($self) = shift;
+	return $self->{dbfile};
+}#dbfile
+
 sub pipesteps{
 	my($self) = shift;
 	return $self->{pipesteps};
@@ -39,6 +51,15 @@ sub set_cohort{
 	undef $self->{pipesteps};
 	$self->{cohort} = $args{cohort};
 	$self->{config} = $self->cohort->config;
+	my $pversion    = $self->config->read("global", "version");
+	my $dir_cohorts = $self->config->read("directories", "work");
+	my $dbfile      = "$dir_cohorts/$pversion.db";
+	#in case we are changing dbfile we need to ensure we are unlocking the old one (just in case, it should be unlocked at this stage)
+	#but if we stay within the same dbfile we do not touch the lock, it may be active!
+	if($self->{dbfile} ne $dbfile){
+		$self->database_unlock;
+		$self->{dbfile} = "$dir_cohorts/$pversion.db";
+	}
 }#set_cohort
 
 sub get_pipesteps{
@@ -189,7 +210,16 @@ sub check_current_step{
 	$stc = $pipesteps->[$step_completed][0] if(defined $step_completed);
 	if($step_next == -1){
 		warn "no more steps to run, pipeline finished\n";
-		$self->cohort->set_completed if(! $self->cohort->has_completed);
+		if(! $self->cohort->has_completed){
+			$self->cohort->set_completed;
+			$self->database_lock;
+			my @individuals;
+			foreach(@{$self->cohort->individual}){
+				push @individuals, $_->id;
+			}
+			$self->database_record(COHORT_RUN_DONE, join(',', @individuals)."\t".modules::Utils::username);
+			$self->database_unlock;
+		}
 		return($stc, $stn);
 	}
 	if(defined $step_current){ #we were given $step_current meaning we are being called from a finishing qsub, we should not run anything from $step_current to avoid racing
@@ -314,5 +344,55 @@ sub get_qjobs{
 		$self->{qjobs}{$_} = $c;
 	}
 }
+
+sub database_lastcohort{
+	my($self, $project) = @_;
+	my $id = 0;
+	
+	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
+	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
+	my $DB;
+	open $DB, $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile);
+	while(<$DB>){
+		chomp;
+		next if(!/^$project\_cohort(\d+)/);
+		$id = $1 if($id < $1);
+	}
+	close $DB;
+	return $id;
+}#database_lastcohort
+
+sub database_record{
+	my($self, $status, $data) = @_;
+
+	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
+	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
+	my $DB;
+	open $DB, ">>", $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for writing");
+	$DB->autoflush(1);
+	print $DB $self->cohort->id."\t$status\t".modules::Utils::get_time_stamp."\t$data\n";
+	close $DB;
+}#database_record
+
+sub database_lock{
+	my($self) = shift;
+
+	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
+	if(defined $self->{semaphore}){
+		warn "pipeline's database $self->dbfile already locked by us\n";
+		return;
+	}
+	my $Semaphore = modules::Semaphore->new($self->dbfile);
+	modules::Exception->throw("couldn't apply lock to semaphore file '".$Semaphore->file_name) if(!$Semaphore->lock(0));
+	$self->{semaphore} = $Semaphore;
+}#database_lock
+
+sub database_unlock{
+	my($self) = shift;
+
+	return if(!defined $self->{semaphore});
+	$self->{semaphore}->unlock;
+	undef $self->{semaphore};
+}#database_unlock
 
 1

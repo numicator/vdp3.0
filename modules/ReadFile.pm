@@ -42,12 +42,14 @@ sub get_readfiles{
 	
 	my @read_files;
 	
+	my $dir_work    = $self->config->read("directories", "work");
 	my $dir_reads   = $self->config->read("directories", "reads");
 	my $read_regex1 = $self->config->read("global", "read_regex1");
 	my $read_regex2 = $self->config->read("global", "read_regex2");
 
 	#warn "Individual ".$self->individual->id."\n";
-	my $dir_indv = join('/', $dir_reads, $self->individual->cohort->id, $self->individual->id);
+	#my $dir_indv = join('/', $dir_reads, $self->individual->cohort->id, $self->individual->id);
+	my $dir_indv = join('/', $dir_work, $self->individual->cohort->id, $dir_reads, $self->individual->id);
 	modules::Exception->throw("Can't access reads directory $dir_indv") if(!-d $dir_indv);
 	opendir(DIR, $dir_indv) or modules::Exception->throw("Can't open reads directory $dir_indv");
 	while(readdir(DIR)){

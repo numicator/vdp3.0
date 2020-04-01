@@ -11,11 +11,12 @@ use modules::Individual;
 use Data::Dumper;
 
 sub new{
-	my($class, $id, $config, $ped) = @_;
+	my($class, $id, $config, $ped, $fqfiles) = @_;
 	my $self = bless {}, $class;
 	$self->{id}     = $id;
 	$self->{config} = $config;
 	$self->{ped}    = $ped;
+	$self->{fqfiles}  = $fqfiles;
 	return $self;
 }
 
@@ -82,16 +83,27 @@ sub make_workdir{
 	my $dir_work   = $config->read("directories", "work");
 	my $dir_qsub   = $config->read("directories", "qsub");
 	my $dir_run    = $config->read("directories", "run");
+	my $dir_reads  = $config->read("directories", "reads");
 	my $dir_tmp    = $config->read("directories", "tmp");
 	my $dir_result = $config->read("directories", "result");
 
 	if(-d "$dir_work/$cohort"){
+		#if($overwrite){
+		#	warn "removing existing working directory '$dir_work/$cohort'\n";
+		#	remove_tree("$dir_work/$cohort");
+		#}
 		if($overwrite){
-			warn "removing existing working directory '$dir_work/$cohort'\n";
-			remove_tree("$dir_work/$cohort");
+			warn "clearning directory:\n";
+			opendir(DIR, "$dir_work/$cohort") or modules::Exception->throw("Can't open reads directory $dir_work/$cohort");
+			while(readdir(DIR)){
+				next if(!(/^$dir_qsub$/ || /^$dir_run$/ || /^$dir_result$/));
+				warn "  $dir_work/$cohort/$_\n";
+				remove_tree("$dir_work/$cohort/$_");
+			}
+			closedir(DIR);
 		}
 		else{
-			warn "working directory '$dir_work/$cohort' already exists; it will NOT be re-created\n";
+			warn "working directory '$dir_work/$cohort' already exists; it will NOT be cleared\n";
 		}
 	}
 	#if(-d "$dir_work/$cohort"){
@@ -105,6 +117,13 @@ sub make_workdir{
 	make_path("$dir_work/$cohort/$dir_run");
 	make_path("$dir_work/$cohort/$dir_run/$dir_tmp");
 	make_path("$dir_work/$cohort/$dir_result");
+	
+	#directiry structure for reads
+	make_path("$dir_work/$cohort/$dir_reads");
+	foreach my $indv(keys %{$self->ped->ped->{$self->id}}){
+		make_path("$dir_work/$cohort/$dir_reads/$indv");
+	}
+
 	#copy config file
 	my($cfn, $cdir) = fileparse($config->file_name);
 	cp($config->file_name, "$dir_work/$cohort/$cfn") or modules::Exception->throw($!);
@@ -113,15 +132,43 @@ sub make_workdir{
 	$self->config->file_append("[cohort]");
 	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort\nusername=$username\ntime_start=$tstamp");
 	$config->reload("$dir_work/$cohort/$cfn");
+	
 	#copy PEDX file and make regular PED file:
 	($cfn, $cdir) = fileparse($self->ped->file_name);
-	cp($self->ped->file_name, "$dir_work/$cohort/$cfn") or modules::Exception->throw($!);
-	$self->ped->reload("$dir_work/$cohort/$cfn");
-	modules::Exception->throw("the cohort extended PED file has to have '.pedx' extension") if($cfn !~ /\.pedx$/);
-	$cfn =~ s/\.pedx/\.ped/;
-	open O, ">$dir_work/$cohort/$cfn" or modules::Exception->throw("Can't open: '$dir_work/$cohort/$cfn' for writing");
-	print O $self->ped->ped_string;
-	close O;
+	if($self->ped->file_name ne "$dir_work/$cohort/$cfn"){
+		cp($self->ped->file_name, "$dir_work/$cohort/$cfn") or modules::Exception->throw($!);
+		chmod 0660, "$dir_work/$cohort/$cfn" or modules::Exception->throw($!);
+		$self->ped->reload("$dir_work/$cohort/$cfn");
+		modules::Exception->throw("the cohort extended PED file has to have '.pedx' extension") if($cfn !~ /\.pedx$/);
+		$cfn =~ s/\.pedx/\.ped/;
+		open O, ">$dir_work/$cohort/$cfn" or modules::Exception->throw("Can't open: '$dir_work/$cohort/$cfn' for writing");
+		print O $self->ped->ped_string;
+		close O;
+	}
+	
+	#copy read files from their original loacation (from Vardb object) to cohort work location
+	if(defined $self->{fqfiles}){
+		foreach my $smpl(keys %{$self->{fqfiles}}){
+			warn "  $smpl - coping fastq files\n";
+			foreach(@{$self->{fqfiles}->{$smpl}}){
+				warn "    ".basename($_->[0]). " ".basename($_->[1])."\n";
+				if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])){
+					cp($_->[0], "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." $!");
+					chmod 0660, "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0]) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." $!");
+				}
+				else{
+					warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])."\n";
+				}
+				if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])){
+					cp($_->[1], "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." $!");
+					chmod 0660, "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1]) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." $!");
+				}
+				else{
+					warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n";
+				}
+			}
+		}
+	}
 }#make_workdir
 
 sub load_ped{

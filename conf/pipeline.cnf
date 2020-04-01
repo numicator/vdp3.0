@@ -14,12 +14,13 @@ env_file=environment.txt
 
 [directories]
 pipeline=/g/data/xx92/$version
-reads=/g/data/xx92/ma8803/reads
+#reads=/g/data/xx92/ma8803/reads
 work=/g/data/xx92/data/$version
 tools=/g/data/xx92/vdp3.0/software
 genome=/g/data/xx92/vdp3.0/GRCh38
 vep_index=$[directories]genome/vep_index
 vep_db=$[directories]genome/vep_db
+reads=reads
 qsub=qsub
 run=run
 result=result

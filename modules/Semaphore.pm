@@ -60,7 +60,7 @@ sub lock{
 		warn basename($self->file_name)." locked all right\n";
 		#print $fh POSIX::strftime("%d-%m-%Y_%H:%M:%S", localtime)."\tLOCK\t".(defined $ENV{'PBS_JOBID'}?$ENV{'PBS_JOBID'}: 'NOT_PBS')."\t".hostname()."\n";
 		my $fh = $self->fh;
-		print $fh "".modules::Utils::get_time_stamp."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\n";
+		print $fh "".modules::Utils::get_time_stamp."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\t".modules::Utils::username."\n";
 		$ret = 1;
 	}
 	else{
@@ -79,7 +79,7 @@ sub unlock{
 	if(flock($self->fh, LOCK_UN)){
 		warn basename($self->file_name)." unlocked all right\n";
 		my $fh = $self->fh;
-		print $fh "".modules::Utils::get_time_stamp()."\tUNLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\n";
+		print $fh "".modules::Utils::get_time_stamp()."\tUNLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\t".modules::Utils::username."\n";
 		$self->{locked} = 0;
 		$ret = 1;
 	}

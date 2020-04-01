@@ -28,6 +28,7 @@ GetOptions(\%OPT,
 	   		"data_file=s",
 	   		"dir_fastq=s",
 	   		"overwrite",
+	   		"delete",
 	   		"submit",
 	   		);
 	   		
@@ -81,7 +82,18 @@ my $dir_cohorts = $Config->read("directories", "work");
 warn "pipeline version: '$pversion', codebase: '$codebase'\n";
 
 modules::Exception->throw("Expected either argument 'cohort' xor 'data_file'") if(defined $OPT{cohort} && defined $OPT{data_file} || !defined $OPT{cohort} && !defined $OPT{data_file});
-#modules::Exception->throw("Missing mandatory argument 'cohort'") if(!defined $OPT{cohort});
+modules::Exception->throw("Argument 'delete' must be used with argument 'cohort'") if(!defined $OPT{cohort} && defined $OPT{'delete'});
+
+#my $dbfile = "$dir_cohorts/$pversion.db";
+#
+#my $Semaphore = modules::Semaphore->new($dbfile);
+#if(!$Semaphore->lock(0)){
+#	warn "couldn't apply lock to semaphore file '".$Semaphore->file_name."'; exiting\n";
+#	die;
+#}
+
+my $Pipeline = modules::Pipeline->new(config => $Config);
+$Pipeline->database_lock;
 
 if(defined $OPT{data_file}){
 	modules::Exception->throw("Specify argumant 'project'") if(!defined $OPT{project});
@@ -91,62 +103,78 @@ if(defined $OPT{data_file}){
 	#foreach my $smpl(keys %{$Vardb->samples}){warn "$smpl\n"}
 	$Vardb->request_family_trees;
 
-	my $dbfile = "$dir_cohorts/$pversion.db";
-	my $Semaphore = modules::Semaphore->new($dbfile);
-	if(!$Semaphore->lock(0)){
-		warn "couldn't apply lock to semaphore file '".$Semaphore->file_name."'; exiting\n";
-		die;
-	}
-
-	my $id = 0;
-	open F, $dbfile or modules::Exception->throw("Couldn't access database file '$dbfile'");
-	while(<F>){
-		chomp;
-		next if(!/^$project\_cohort(\d+)/);
-		$id = $1 if($id < $1);
-	}
-	close F;
+	my $id = $Pipeline->database_lastcohort($project);
+	modules::Exception->throw("couldn't read from database the last cohort number for project $project") if(!defined $id);
 	$id++;
 	warn "next cohort number for project $project is $id\n";
-	my $O;
-	open $O, ">>$dbfile" or modules::Exception->throw("Couldn't access database file '$dbfile' for writing");
-	$O->autoflush(1);
+	#my $O;
+	#open $O, ">>$dbfile" or modules::Exception->throw("Couldn't access database file '$dbfile' for writing");
+	#$O->autoflush(1);
 	foreach my $famid(keys %{$Vardb->cohorts}){
 		my $cohort = sprintf("%s_cohort%04d", $project, $id);
 		warn "creting cohort $cohort ($famid)\n";
-		print $O "$cohort\tSTART\t".modules::Utils::get_time_stamp."\t".join(',', sort keys %{$Vardb->cohorts->{$famid}})."\n";
+		#print $O "$cohort\tSTART\t".modules::Utils::get_time_stamp."\t".join(',', sort keys %{$Vardb->cohorts->{$famid}})."\n";
 		my $pedex = $Vardb->pedx($famid, $cohort, $Vardb->dir_ped."/$cohort.pedx");
 		#foreach(@$pedex){warn join("\t", @$_)."\n";}warn "\n";
+		my $PED = modules::PED->new($Vardb->dir_ped."/$cohort.pedx");
+		modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
+		modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
+		warn "processing cohort $cohort\n";
+
+		$Config = modules::Config->new("$confdir/pipeline.cnf"); #we need to refresh our config for each cohort
+		my %fqfiles;
+		foreach(sort keys %{$Vardb->cohorts->{$famid}}){
+			#$Vardb->samples->{$_}->{$fq};
+			$fqfiles{$_} = $Vardb->samples->{$_}->{fq};
+		}
+		
+		my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles);
+		$Pipeline->set_cohort(cohort => $Cohort);
+		$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
+		$Cohort->make_workdir($OPT{overwrite});
+		$Cohort->add_individuals_ped;
+		$Cohort->config_add_readfiles;
+		$Pipeline->get_pipesteps;
+		$Pipeline->make_qsubs(1);
+		$Pipeline->config->reload;
+		
 		$id++;
 	}
-	close $O;
-	$Semaphore->unlock;
-	die "greaceful death\n";
+	#close $O;
+	#die "greaceful death\n";
 }
 
 if(defined $OPT{cohort}){
 	my $cohort = $OPT{cohort};
-	$dir_reads .= "/$cohort";
-	modules::Exception->throw("Can't access reads directory $dir_reads") if(!-d $dir_reads);
-	#warn "cohort read directory: $dir_reads\n";
-
-	my $PED = modules::PED->new("$dir_reads/$cohort.pedx");
+	my $dir_cohort .= "$dir_cohorts/$cohort";
+	
+	if(defined $OPT{delete}){
+		warn "deleting directory $dir_cohorts/$cohort\n";
+		remove_tree($dir_cohort);
+		$Pipeline->database_unlock;
+		exit 0;
+	}
+	
+	#$Config = modules::Config->new("$dir_cohort/pipeline.cnf");
+	my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 	modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 	modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 	warn "processing cohort '$cohort'\n";
-
 	my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+	$Pipeline->set_cohort(cohort => $Cohort);
+	$Cohort->reset_completed if($Cohort->has_completed);
 	$Cohort->make_workdir($OPT{overwrite});
 	$Cohort->add_individuals_ped;
-	#$Cohort->config_add_readfiles if($OPT{overwrite});
 	$Cohort->config_add_readfiles;
 
-	my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
+	my @individuals;
+	foreach(@{$Cohort->individual}){
+		push @individuals, $_->id;
+	}
+	$Pipeline->database_record(COHORT_RUN_START, join(',', sort @individuals)."\t".modules::Utils::username);
 	$Pipeline->get_pipesteps;
-	#$Pipeline->make_qsubs($OPT{overwrite});
 	$Pipeline->make_qsubs(1);
 	$Pipeline->config->reload;
-	#$Pipeline->config_add_steps();
 
 	if(defined $OPT{submit}){
 		warn "starting the pipeline - submitting the first step\n";
@@ -155,3 +183,7 @@ if(defined $OPT{cohort}){
 	}
 	#$Pipeline->pipe_start() if(defined $OPT{submit});
 }
+
+$Pipeline->database_unlock;
+
+exit 0;

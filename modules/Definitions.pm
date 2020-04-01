@@ -31,6 +31,9 @@ BEGIN{
 		PIPE_STOP        => 88,
 		PIPE_NO_PROGRESS => 66,
 		
+		COHORT_RUN_START => 'START',
+		COHORT_RUN_DONE  => 'DONE',
+		
 		TIMESTAMP => '%d-%m-%Y_%H:%M:%S'
 	);
 }
