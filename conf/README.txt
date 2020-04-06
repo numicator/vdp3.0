@@ -22,9 +22,40 @@ wget https://github.com/broadinstitute/picard/releases/download/2.22.0/picard.ja
 
 #GATK4
 #https://github.com/broadinstitute/gatk/releases
-wget https://github.com/broadinstitute/gatk/releases/download/4.1.5.0/gatk-4.1.5.0.zip
+wget https://github.com/broadinstitute/gatk/releases/download/4.1.6.0/gatk-4.1.6.0.zip
+
+#python env needed for CNV: (forget about using the default pythonlib, it needs to be explicitly disconnected)
+cd <software>/sources
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+module load java/jdk-13.33 python3-as-python
+bash Miniconda3-latest-Linux-x86_64.sh
+source <software>/miniconda3/etc/profile.d/conda.sh
+cd <software>/gatk-4.1.6.0
+unset PYTHONPATH # VERY IMPORTANT!!!
+conda env create -f gatkcondaenv.yml
+#to check:
+conda activate gatk
+conda deactivate
+
+#remove from your .bashrc following lines:
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/g/data/xx92/vdp3.0/software/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/g/data/xx92/vdp3.0/software/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/g/data/xx92/vdp3.0/software/miniconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/g/data/xx92/vdp3.0/software/miniconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
+
 
 #GATK3
+#*** we don't use it anymore ***
 https://gatkforums.broadinstitute.org/gatk/discussion/10328/combinevariants-in-gatk4
 wget https://storage.cloud.google.com/gatk-software/package-archive/gatk/GenomeAnalysisTK-3.8-1-0-gf15c1c3ef.tar.bz2
 needs java: "1.8.0_40"; module load java/jdk-8.40
@@ -155,8 +186,9 @@ git clone https://github.com/brentp/peddy
 cd peddy
 pip3.7 install --prefix=/g/data/xx92/vdp3.0/software/pythonlib --editable .
 #to check:
-python3.7 -m peddy -p 4 --plot --prefix ceph-1463 data/ceph1463.peddy.vcf.gz data/ceph1463.ped
+python3.7 -m peddy -p 4 --plot --prefix data/ceph-1463 data/ceph1463.peddy.vcf.gz data/ceph1463.ped
 #there is an issue in curent peddy:
+#*** FIXED NOW, no need to apply ***
 File "peddy/peddy/cli.py", line 105, in correct_sex_errors
   osc[sel] = ito
 IndexError: arrays used as indices must be of integer (or boolean) type
@@ -234,6 +266,181 @@ https://gatkforums.broadinstitute.org/gatk/discussion/comment/56727
 	1000G_omni2.5.hg38.vcf.gz
 	1000G_phase1.snps.high_confidence.hg38.vcf.gz
 
+
+#####################################################################
+# make gvcf database for joint calling and vqsr'ing:
+#
+module load java/jdk-13.33 python3-as-python
+source /g/data/xx92/vdp3.0/conf/environment.txt
+cd /g/data/xx92/data/vdp3.0/
+dir_out=TMP
+
+#rename samples in gvcfs = add prefix TMP_
+for split in 01 02 03 04 05 06 07 08 09 10; do
+  echo "doing split: $split"
+  #gvcfs to be used:
+  for f in ccg_cohort00*/run/gatk_hc/*.$split.g.vcf.gz; do
+    echo "  $f"
+    o=$(basename $f)
+    zcat $f | awk 'BEGIN{FS="\t"; OFS=FS} {if($1 == "#CHROM"){$10="TMP_"$10} print $0}' | bgzip -c >$dir_out/$o
+    tabix $dir_out/$o
+  done
+done
+
+#genearate GATK genomic databases, one per split
+mkdir -p /g/data/xx92/vdp3.0/GRCh38/gvcfs
+for split in 01 02 03 04 05 06 07 08 09 10; do
+  if [ "$split" == "01" ]; then bed="1_21"; fi
+  if [ "$split" == "02" ]; then bed="2_18"; fi
+  if [ "$split" == "03" ]; then bed="3_14"; fi
+  if [ "$split" == "04" ]; then bed="4_15_M"; fi
+  if [ "$split" == "05" ]; then bed="5_13_Y"; fi
+  if [ "$split" == "06" ]; then bed="6_9"; fi
+  if [ "$split" == "07" ]; then bed="7_10"; fi
+  if [ "$split" == "08" ]; then bed="8_11"; fi
+  if [ "$split" == "09" ]; then bed="12_22_X_Un"; fi
+  if [ "$split" == "10" ]; then bed="16_17_19_20"; fi
+  bed="$bed.bed"
+  echo "doing split: $split bed: $bed"
+  vcfs=""
+  for f in $dir_out/*.$split.g.vcf.gz; do
+    vcfs="$vcfs -V $f"
+  done
+  /g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GenomicsDBImport \
+  --tmp-dir /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/tmp \
+  --merge-input-intervals true \
+  --interval-set-rule INTERSECTION \
+  -L /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/bam/regions.bed \
+  -L /g/data/xx92/vdp3.0/GRCh38/splits/$bed \
+  --overwrite-existing-genomicsdb-workspace true \
+  --genomicsdb-workspace-path /g/data/xx92/vdp3.0/GRCh38/gvcfs/CCG_WES.$split.gdb \
+  $vcfs
+done
+#####################################################################
+
+
+#####################################################################
+# make cnv model:
+#
+cd /g/data/xx92/data/vdp3.0/
+source /g/data/xx92/vdp3.0/conf/environment.txt
+unset PYTHONPATH
+source /g/data/xx92/vdp3.0/software/miniconda3/etc/profile.d/conda.sh
+conda activate gatk; conda info
+python --version
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk DetermineGermlineContigPloidy \
+--tmp-dir /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/tmp \
+-L /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/targets_preprocessed.interval_list \
+-imr OVERLAPPING_ONLY  \
+--contig-ploidy-priors /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/contig_ploidy_prior.tsv \
+--output /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ \
+--output-prefix ploidy_WES \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0554.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0555.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0676.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0677.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0678.tsv \
+-I ccg_cohort0003/run/gatk_cnv/ccg_cohort0003-RM8398.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0634.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0698.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0668.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0669.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0670.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0529.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0671.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0672.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0638.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0639.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0640.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0665.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0666.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0667.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0673.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0674.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0675.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0177.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0702.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0703.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0573.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0643.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0644.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0620.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0621.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0622.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0617.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0618.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0619.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0630.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0631.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0632.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0613.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0614.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0615.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0616.tsv \
+-I ccg_cohort0016/run/gatk_cnv/ccg_cohort0016-CCG0624.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0610.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0641.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0642.tsv
+
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller \
+--run-mode COHORT \
+--tmp-dir /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/tmp \
+--contig-ploidy-calls /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ploidy_WES-calls/ \
+--output /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ \
+--output-prefix caller_WES \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0554.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0555.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0676.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0677.tsv \
+-I ccg_cohort0002/run/gatk_cnv/ccg_cohort0002-CCG0678.tsv \
+-I ccg_cohort0003/run/gatk_cnv/ccg_cohort0003-RM8398.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0634.tsv \
+-I ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0698.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0668.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0669.tsv \
+-I ccg_cohort0005/run/gatk_cnv/ccg_cohort0005-CCG0670.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0529.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0671.tsv \
+-I ccg_cohort0006/run/gatk_cnv/ccg_cohort0006-CCG0672.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0638.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0639.tsv \
+-I ccg_cohort0007/run/gatk_cnv/ccg_cohort0007-CCG0640.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0665.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0666.tsv \
+-I ccg_cohort0008/run/gatk_cnv/ccg_cohort0008-CCG0667.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0673.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0674.tsv \
+-I ccg_cohort0009/run/gatk_cnv/ccg_cohort0009-CCG0675.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0177.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0702.tsv \
+-I ccg_cohort0010/run/gatk_cnv/ccg_cohort0010-CCG0703.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0573.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0643.tsv \
+-I ccg_cohort0011/run/gatk_cnv/ccg_cohort0011-CCG0644.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0620.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0621.tsv \
+-I ccg_cohort0012/run/gatk_cnv/ccg_cohort0012-CCG0622.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0617.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0618.tsv \
+-I ccg_cohort0013/run/gatk_cnv/ccg_cohort0013-CCG0619.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0630.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0631.tsv \
+-I ccg_cohort0014/run/gatk_cnv/ccg_cohort0014-CCG0632.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0613.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0614.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0615.tsv \
+-I ccg_cohort0015/run/gatk_cnv/ccg_cohort0015-CCG0616.tsv \
+-I ccg_cohort0016/run/gatk_cnv/ccg_cohort0016-CCG0624.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0610.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0641.tsv \
+-I ccg_cohort0017/run/gatk_cnv/ccg_cohort0017-CCG0642.tsv
+#####################################################################
 
 
 
@@ -463,4 +670,10 @@ gatk --java-options -Xmx6g FilterVariantTranches \
       --resource ~{dbsnp_resource_vcf} \
       --info-key ~{info_key} \
       --create-output-variant-index true
+
+
+
+
+
+
 

@@ -115,7 +115,7 @@ modules::Exception->throw("cohort id submited as argument is not the same as coh
 
 my $cmd = $Config->read("step:$step", "gatk_bin");
 
-$cmd .= " --tmp-dir $dir_tmp -I ".join(" -I ", @files)." -O $dir_run/$cohort-$individual.recal_data.tbl";
+$cmd .= " GatherBQSRReports --tmp-dir $dir_tmp -I ".join(" -I ", @files)." -O $dir_run/$cohort-$individual.recal_data.tbl";
 
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);

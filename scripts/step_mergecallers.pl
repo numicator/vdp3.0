@@ -91,6 +91,8 @@ my $dir_cohort  = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 
@@ -164,6 +166,7 @@ exit(1) if($r);
 $cmd = "$tabix_bin -f $dir_run/$cohort.$split.vcf.gz";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
+
 exit(0);
 
 END{

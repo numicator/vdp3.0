@@ -122,7 +122,7 @@ my $minBQ = $Config->read("step:$step", "min_BQ");
 
 #it is not necessary to limit region to split as we use split-specific bams from BQSR step:
 warn "creating mpileup file (these mpileups ARE region filtered):\n";
-my $cmdx = " -Q $minBQ -l $dir_run/regions.bed -f $reference $dir_bam/".join(" $dir_bam/", @bams)." >$dir_run/$cohort.$split.mpileup";
+my $cmdx = " mpileup -Q $minBQ -l $dir_run/regions.bed -f $reference $dir_bam/".join(" $dir_bam/", @bams)." >$dir_run/$cohort.$split.mpileup";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);

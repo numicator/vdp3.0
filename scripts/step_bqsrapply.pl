@@ -97,7 +97,7 @@ my $dir_mdupl = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config-
 modules::Exception->throw("Can't access cohort run directory $dir_mdupl") if(!-d $dir_mdupl);
 my $dir_gather = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:bqsr_gather_rep", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_gather") if(!-d $dir_gather);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
@@ -114,7 +114,7 @@ modules::Exception->throw("cohort id submited as argument is not the same as coh
 my $cmd       = $Config->read("step:$step", "gatk_bin");
 my $reference = $Config->read("references", "genome_fasta");
 
-my $cmdx = " --tmp-dir $dir_tmp -R $reference --interval-set-rule INTERSECTION -L $regions -L $split_bed --create-output-bam-index --add-output-sam-program-record --use-original-qualities --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -bqsr $dir_gather/$cohort-$individual.recal_data.tbl -I $dir_mdupl/$cohort-$individual.duplicatemarked.bam -O $dir_run/$cohort-$individual.$split.bqsr.bam";
+my $cmdx = " ApplyBQSR --tmp-dir $dir_tmp -R $reference --interval-set-rule INTERSECTION -L $regions -L $split_bed --create-output-bam-index --add-output-sam-program-record --use-original-qualities --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -bqsr $dir_gather/$cohort-$individual.recal_data.tbl -I $dir_mdupl/$cohort-$individual.duplicatemarked.bam -O $dir_run/$cohort-$individual.$split.bqsr.bam";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);

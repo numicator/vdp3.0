@@ -98,12 +98,10 @@ my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_mpileup = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:mpileup", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_mpileup") if(!-d $dir_mpileup);
+my $dir_gvcfs = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_genotype_gvcfs", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_gvcfs") if(!-d $dir_gvcfs);
 my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
-my $samples = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/samples.txt';
-modules::Exception->throw("Can't access samples list file $samples") if(!-e $samples);
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
@@ -115,65 +113,97 @@ $Cohort->add_individuals_ped();
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
-my $mode2 = $mode eq 'SNP'? 'mpileup2snp': 'mpileup2indel';
-
-if($fun eq 'call'){
-	call();
+if($fun eq 'recal'){
+	recal();
 }
 else{
-	filter()
+	apply()
 }
 exit(0);
 
 ####################################################################################################
-# mpileup2<snp|indel>
+# VariantRecalibrator
 #
-sub call{
-	#my $reference = $Config->read("references", "genome_fasta");
-	my $min_coverage = $Config->read("step:$step", "min_coverage");
-	my $min_reads2 = $Config->read("step:$step", "min_reads2");
-	my $min_avg_qual = $Config->read("step:$step", "min_avg_qual");
-	my $min_var_freq = $Config->read("step:$step", "min_var_freq");
-	my $p_value = $Config->read("step:$step", "p_value");
-	my $bgzip = $Config->read("step:$step", "bgzip_bin");
-	my $cmd = $Config->read("step:$step", "varscan_bin");
-	my $cmdx = " $mode2 $dir_mpileup/$cohort.$split.mpileup --vcf-sample-list $samples --min-coverage $min_coverage --min-reads2 $min_reads2 --min-avg-qual $min_avg_qual --min-var-freq $min_var_freq --p-value $p_value --output-vcf | $bgzip -c >$dir_run/$cohort.$split.$mode.vcf.gz";
-	$cmdx =~ s/\s+-/ \\\n  -/g;
-	$cmd .= $cmdx;
-	#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-	my $r = $Syscall->run($cmd, 1);
+sub recal{
+	my $reference   = $Config->read("references", "genome_fasta");
+	my $tranche     = $Config->read("step:$step", "tranche");
+	my $annotation  = $Config->read("step:$step", "annotation");
+	my $resources   = $Config->read("step:$step", "resources");
+	my $gauss       = $Config->read("step:$step", "gauss");
+	my $makeplots   = $Config->read("step:$step", "makeplots");
+	my $plots_bin   = $Config->read("step:$step", "plots_bin");
+	
+	$tranche    = ",$tranche";
+	$annotation = ",$annotation";
+	$resources  = ";$resources";
+	$tranche =~ s/[,;]/ -tranche /g;
+	$annotation =~ s/[,;]/ -an /g;
+	$resources  =~ s/;/ -resource:/g;
+	my @gausses = split /[,;]/, $gauss;
+
+	#get all split vcf files for recalibration, recalibration is run on all spit vcfs together:
+	my @files;
+	foreach(sort keys %{$Config->read("split")}){
+		my $f = "$dir_gvcfs/$cohort.$_.vcf.gz";
+		modules::Exception->throw("Can't access file '$f'") if(!-e $f);
+		modules::Exception->throw("File '$f' is empty") if(!-s $f);
+		push @files, $f;
+	}
+
+	#--max-gaussians is a tricky argument, gatk tends to fail if it was set to high, we are trying several values from the config file and accepting the first success 
+	my $r = -1;
+	foreach my $g(@gausses){
+		warn "running with --max-gaussians $g\n";
+		my $cmd = $Config->read("step:$step", "gatk_bin");
+		my $cmdx = " VariantRecalibrator -mode $mode --tmp-dir $dir_tmp -R $reference -L $regions $tranche $annotation $resources --max-gaussians $g --trust-all-polymorphic -V ".join(" -V ", @files)." --tranches-file $dir_run/$cohort.$mode.tranches -O $dir_run/$cohort.$mode.recall.vcf.gz";
+		$cmdx =~ s/\s+-/ \\\n  -/g;
+		$cmd .= $cmdx;
+		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+		$r = $Syscall->run($cmd, 1);
+		if($r){
+			warn "run with --max-gaussians $g FAILED\n";
+		}
+		else{
+			last;
+		}
+	}
 	exit(1) if($r); #exit with $r would be tricky as bash sees only 8 bits, instead of converting we just return 1
-	
-	my $tabix    = $Config->read("step:$step", "tabix_bin");
-	$cmd = "$tabix -f $dir_run/$cohort.$split.$mode.vcf.gz";
-	$r = $Syscall->run($cmd, 1);
-	exit(1) if($r);
-	
-	if($mode eq 'SNP'){
-		my $bcftools = $Config->read("step:$step", "bcftools_bin");
-		modules::Exception->throw("could not access file '$dir_run/$cohort.$split.INDEL.vcf.gz'; this step must be first run in -mode INDEL, then in -mode SNP") if(! -e "$dir_run/$cohort.$split.INDEL.vcf.gz");
-		$cmd = "$bcftools concat -a $dir_run/$cohort.$split.{SNP,INDEL}.vcf.gz | $bgzip -c >$dir_run/$cohort.$split.vcf.gz";
-		$r = $Syscall->run($cmd);
-		exit(1) if($r);
-		$cmd = "$tabix -f $dir_run/$cohort.$split.vcf.gz";
-		$r = $Syscall->run($cmd);
+	if($makeplots eq 'true'){
+		my $cmd = "$plots_bin $dir_run/$cohort.$mode.tranches";
+		$r = $Syscall->run($cmd, 1);
 		exit(1) if($r);
 	}
-}#call
+}#recal
 
 
 ####################################################################################################
-# filter
+# ApplyVQSR
 #
-sub filter{
+sub apply{
+	my $split_bed   = $Config->read($Config->read("split", $split), "bed");
+	my $filter = $Config->read("step:$step", "sensitivity_cutoff");
+
 	my $cmd = $Config->read("step:$step", "gatk_bin");
-	my $cmdx = "";
+	my $bcftools = $Config->read("step:$step", "bcftools_bin");
+	my $tabix    = $Config->read("step:$step", "tabix_bin");
+
+	my $variant = $mode eq 'INDEL'? "$dir_gvcfs/$cohort.$split.vcf.gz": "$dir_run/$cohort.$split.INDEL.vqsr.vcf.gz";
+	my $fo      = "$dir_run/".($mode eq 'INDEL'? "$cohort.$split.$mode.vqsr.vcf.gz": "$cohort.$split.vqsr.vcf.gz");
+	my $fout    = $mode eq 'INDEL'? $fo: "/dev/stdout | $bcftools view -f PASS -O z - -o $fo";
+
+	modules::Exception->throw("'$variant' file not found - this step must be first run in -mode INDEL and only then in -mode SNP") if($mode eq 'SNP' && !-e $variant);
+
+	#--create-output-variant-index true
+	my $cmdx = " ApplyVQSR -mode $mode --tmp-dir $dir_tmp -L $regions -L $split_bed --truth-sensitivity-filter-level $filter --create-output-variant-index false --tranches-file $dir_run/$cohort.$mode.tranches --recal-file $dir_run/$cohort.$mode.recall.vcf.gz -V $variant -O $fout";
 	$cmdx =~ s/\s+-/ \\\n  -/g;
 	$cmd .= $cmdx;
 	#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 	my $r = $Syscall->run($cmd);
 	exit(1) if($r);
-}#filter
+	$cmd = "$tabix -f $fo";
+	$r = $Syscall->run($cmd);
+	exit(1) if($r);
+}#apply
 
 END{
 	warn "done script ".basename(__FILE__)."\n"

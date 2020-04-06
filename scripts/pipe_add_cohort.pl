@@ -138,6 +138,12 @@ if(defined $OPT{data_file}){
 		$Pipeline->make_qsubs(1);
 		$Pipeline->config->reload;
 		
+		if(defined $OPT{submit}){
+			warn "starting the pipeline - submitting the first step\n";
+			my($step_completed, $step_next) = $Pipeline->check_current_step;
+			$Pipeline->submit_step($step_next);
+		}
+
 		$id++;
 	}
 	#close $O;

@@ -92,12 +92,13 @@ my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_haplotype_caller = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_haplotype_caller", "dir");
+my $dir_haplotype_caller = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_hc", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_haplotype_caller") if(!-d $dir_haplotype_caller);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
+my $gvcfdb = $Config->read($Config->read("split", $split), "gvcfdb");
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
@@ -121,13 +122,21 @@ foreach(sort @{$Cohort->individual}){
 	push @files, $f;
 }
 
-warn "MA: remove_tree(\"$dir_run/$cohort.$split.gdb\")\n";
+#warn "MA: remove_tree(\"$dir_run/$cohort.$split.gdb\")\n";
 remove_tree("$dir_run/$cohort.$split.gdb");
-my $cmdx .= " --tmp-dir $dir_tmp --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -V ".join(" -V ", @files)." --overwrite-existing-genomicsdb-workspace true --genomicsdb-workspace-path $dir_run/$cohort.$split.gdb";
+warn "coping GenomicsDB $gvcfdb => $dir_run/$cohort.$split.gdb\n";
+my $cmdx = "cp -a $gvcfdb $dir_run/$cohort.$split.gdb";
+my $r = $Syscall->run($cmdx);
+exit(1) if($r);
+
+warn "adding cohort samples to GenomicsDB $dir_run/$cohort.$split.gdb\n";
+$cmdx = " GenomicsDBImport --tmp-dir $dir_tmp -V ".join(" -V ", @files)." --genomicsdb-update-workspace-path $dir_run/$cohort.$split.gdb";
+#version without the 'background' GenomicsDBI:
+#my $cmdx = " GenomicsDBImport --tmp-dir $dir_tmp --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -V ".join(" -V ", @files)." --overwrite-existing-genomicsdb-workspace true --genomicsdb-workspace-path $dir_run/$cohort.$split.gdb";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
 exit(0);
 

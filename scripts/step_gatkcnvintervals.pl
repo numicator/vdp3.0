@@ -2,6 +2,7 @@
 use strict;
 use Data::Dumper;
 use Getopt::Long;
+use File::Copy qw(cp mv);
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
@@ -28,6 +29,7 @@ GetOptions(\%OPT,
 	   		"individual=s",
 	   		"readfile=s",
 	   		"split=s",
+	   		"mode=s",
 	   		"exit=s"
 	   		);
 	   		
@@ -70,7 +72,7 @@ Marcin Adamski
 
 =cut
 
-
+my $mode       = $OPT{mode};
 my $step       = $OPT{step};
 my $split      = $OPT{'split'};
 my $cohort     = $OPT{cohort};
@@ -83,33 +85,38 @@ warn "running pipeline step '$step".(defined $split? $split: '')."' on cohort '$
 my $Config   = modules::Config->new($OPT{config});
 my $Syscall  = modules::SystemCall->new();
 
-my $pversion    = $Config->read("global", "version");
-my $codebase    = $Config->read("directories", "pipeline");
+my $pversion = $Config->read("global", "version");
+my $codebase = $Config->read("directories", "pipeline");
 warn "pipeline version: '$pversion', codebase: '$codebase'\n";
-my $dir_cohort  = $Config->read("cohort", "dir");
+
+my $dir_cohort = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
+
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_merge_bam = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_bam", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_merge_bam") if(!-d $dir_merge_bam);
 
-#my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
-#modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
-#modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
-#my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
-#$Cohort->add_individuals_ped();
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
+modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
+modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
+
+my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+$Cohort->add_individuals_ped();
 #my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
-my $cmd = $Config->read("step:$step", "picard_bin");
-$cmd .= " MarkDuplicates TMP_DIR=$dir_tmp MAX_RECORDS_IN_RAM=300000 OPTICAL_DUPLICATE_PIXEL_DISTANCE=2500 VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true I=$dir_merge_bam/$cohort-$individual.bwa.bam O=$dir_run/$cohort-$individual.duplicatemarked.bam M=$dir_run/$cohort-$individual.duplicatemetrics.txt";
+my $reference = $Config->read("references", "genome_fasta");
+my $region    = $Config->read("targets", "hs_target");
+my $cmd       = $Config->read("step:$step", "gatk_bin");
 
-#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+$cmd .= " PreprocessIntervals --tmp-dir $dir_tmp -R $reference -L $region --padding 250 --bin-length 0 -imr OVERLAPPING_ONLY -O $dir_run/targets_preprocessed.interval_list";
 my $r = $Syscall->run($cmd);
 exit(1) if($r);
+
 exit(0);
 
 END{

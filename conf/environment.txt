@@ -1,4 +1,4 @@
 #pipeline enivronment definition
 export PERL5LIB="/g/data/xx92/vdp3.0:/g/data/xx92/vdp3.0/software/perl5/lib/perl5"
 export PYTHONPATH="/g/data/xx92/vdp3.0/software/pythonlib/lib/python3.7/site-packages"
-export PATH="/g/data/xx92/vdp3.0/software/pythonlib/bin:$PATH"
+export PATH="/g/data/xx92/vdp3.0/software/pythonlib/bin:/g/data/xx92/vdp3.0/software/htslib-1.10.2:$PATH"

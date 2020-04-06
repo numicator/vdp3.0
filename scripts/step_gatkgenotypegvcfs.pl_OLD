@@ -2,7 +2,6 @@
 use strict;
 use Data::Dumper;
 use Getopt::Long;
-use File::Copy qw(cp mv);
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
@@ -29,7 +28,6 @@ GetOptions(\%OPT,
 	   		"individual=s",
 	   		"readfile=s",
 	   		"split=s",
-	   		"mode=s",
 	   		"exit=s"
 	   		);
 	   		
@@ -72,7 +70,7 @@ Marcin Adamski
 
 =cut
 
-my $mode       = $OPT{mode};
+
 my $step       = $OPT{step};
 my $split      = $OPT{'split'};
 my $cohort     = $OPT{cohort};
@@ -91,11 +89,17 @@ warn "pipeline version: '$pversion', codebase: '$codebase'\n";
 
 my $dir_cohort = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
-
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
+modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
+
+my $dir_gvcfs = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_combine_gvcfs", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_gvcfs") if(!-d $dir_gvcfs);
+
+my $split_bed = $Config->read($Config->read("split", $split), "bed");
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
@@ -107,52 +111,27 @@ $Cohort->add_individuals_ped();
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
+my $cmd       = $Config->read("step:$step", "gatk_bin");
 my $reference = $Config->read("references", "genome_fasta");
 
-my @indvs;
-my %kits;
-foreach my $indv(keys %{$PED->ped->{$cohort}}){
-	my $kit = $PED->ped->{$cohort}{$indv}{capturekit};
-	my $kit_bed = $Config->read("targets", "$kit");
-	$kits{$kit_bed} = 1;
-	push @indvs, $indv;
-}
+#my @files;
+#foreach(sort @{$Cohort->individual}){
+#	my $indv = $_->id;
+#	my $f = "$dir_gvcfs/$cohort-$indv.$split.g.vcf";
+#	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
+#	modules::Exception->throw("File '$f' is empty") if(!-s $f);
+#	push @files, $f;
+#}
 
-#text file with all samples, order of the samples will need to stay the same through the analysis:
-open my $o, ">$dir_run/samples.txt" or modules::Exception->throw("Can't open $dir_run/samples.txt for writing\n");
-warn "samples:\n";
-foreach(sort @indvs){
-	warn "  $_\n";
-	print $o "$_\n";
-}
-close $o;
-
-my $r; #exit code from $Syscall->run
-my $cmd = $Config->read("step:$step", "bedintersect_bin");
-my @k = sort keys %kits;
-modules::Exception->throw("sequencing target, e.g. WGS, WES must be specified in the cohort PED file") if(!scalar @k);
-warn "target regions:\n";
-warn "  add: $k[0]\n";
-cp($k[0], "$dir_run/regions_a.tmp") or modules::Exception->throw($!);
-for(my $i = 1; $i < scalar @k; $i += 2){
-	warn "  add: $k[$i]\n";
-	my $cmdx = "$cmd -a $dir_run/regions_a.tmp -b $k[$i] >$dir_run/regions.tmp";
-	$r = $Syscall->run($cmdx);
-	exit(1) if($r);
-	mv("$dir_run/regions.tmp", "$dir_run/regions_a.tmp");
-}
-mv("$dir_run/regions_a.tmp", "$dir_run/regions.bed");
-my $cmd_bgzip = $Config->read("step:$step", "bgzip_bin");
-my $cmd_tabix = $Config->read("step:$step", "tabix_bin");
-
-$cmd = "$cmd_bgzip -c $dir_run/regions.bed >$dir_run/regions.bed.gz";
-$r = $Syscall->run($cmd);
+my $cmdx .= " GenotypeGVCFs --tmp-dir $dir_tmp -R $reference --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -G StandardAnnotation -G AS_StandardAnnotation --only-output-calls-starting-in-intervals true -V gendb://$dir_gvcfs/$cohort.$split.gdb -O $dir_run/$cohort.$split.vcf.gz";
+$cmdx =~ s/\s+-/ \\\n  -/g;
+$cmd .= $cmdx;
+#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+my $r = $Syscall->run($cmd);
 exit(1) if($r);
-
-$cmd = "$cmd_tabix $dir_run/regions.bed.gz";
-$r = $Syscall->run($cmd);
-exit(1) if($r);
+exit(0);
 
 END{
 	warn "done script ".basename(__FILE__)."\n"
 }
+-R $reference

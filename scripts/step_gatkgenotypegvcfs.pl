@@ -93,7 +93,7 @@ my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $dir_gvcfs = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_combine_gvcfs", "dir");
@@ -114,24 +114,28 @@ $Cohort->add_individuals_ped();
 my $cmd       = $Config->read("step:$step", "gatk_bin");
 my $reference = $Config->read("references", "genome_fasta");
 
-#my @files;
-#foreach(sort @{$Cohort->individual}){
-#	my $indv = $_->id;
-#	my $f = "$dir_gvcfs/$cohort-$indv.$split.g.vcf";
-#	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
-#	modules::Exception->throw("File '$f' is empty") if(!-s $f);
-#	push @files, $f;
-#}
+my @indv;
+foreach(sort @{$Cohort->individual}){
+	push @indv, $_->id;
+}
 
-my $cmdx .= " --tmp-dir $dir_tmp -R $reference --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -G StandardAnnotation -G AS_StandardAnnotation --only-output-calls-starting-in-intervals true -V gendb://$dir_gvcfs/$cohort.$split.gdb -O $dir_run/$cohort.$split.vcf.gz";
+my $r = 0;
+my $cmdx;
+$cmdx = " GenotypeGVCFs --tmp-dir $dir_tmp -R $reference --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -G StandardAnnotation -G AS_StandardAnnotation --only-output-calls-starting-in-intervals true -V gendb://$dir_gvcfs/$cohort.$split.gdb -O $dir_run/$cohort.$split.4vqsr.vcf.gz";
 $cmdx =~ s/\s+-/ \\\n  -/g;
-$cmd .= $cmdx;
+$cmdx = "$cmd $cmdx";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
+$r = $Syscall->run($cmdx);
 exit(1) if($r);
-exit(0);
 
+#warn "select samples and variants from the cohort\n";
+$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.4vqsr.vcf.gz -O $dir_run/$cohort.$split.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true --remove-unused-alternates true";
+$cmdx =~ s/\s+-/ \\\n  -/g;
+$cmdx = "$cmd $cmdx";
+$r = $Syscall->run($cmdx);
+exit(1) if($r);
+
+exit(0);
 END{
 	warn "done script ".basename(__FILE__)."\n"
 }
--R $reference

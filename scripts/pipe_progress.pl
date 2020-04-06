@@ -25,7 +25,8 @@ GetOptions(\%OPT,
 	   		"cohort=s",
 	   		"step=s",
 	   		"split=s",
-	   		"status=s"
+	   		"status=s",
+	   		"no_submit"
 	   		);
 	   		
 pod2usage(-verbose => 2) if $OPT{man};
@@ -88,7 +89,7 @@ else{
 	push @cohorts, $OPT{cohort};
 }
 
-my $Pipeline = modules::Pipeline->new();
+my $Pipeline = modules::Pipeline->new(config => $Config);
 $Pipeline->get_qjobs;
 
 foreach my $cohort(@cohorts){
@@ -133,7 +134,12 @@ foreach my $cohort(@cohorts){
 	#$Pipeline->get_qjobs;
 	warn "running Pipeline->check_current_step('".(defined $OPT{step}? $OPT{step}: '')."')\n";
 	my($step_completed, $step_next) = $Pipeline->check_current_step($OPT{step});
-	$Pipeline->submit_step($step_next) if(defined $step_next);
+	if(defined $OPT{no_submit}){
+		warn "no job submissions by user's request\n";
+	}
+	else{
+		$Pipeline->submit_step($step_next) if(defined $step_next);
+	}
 	$Semaphore->unlock;
 }#foreach(@cohorts)
 

@@ -92,6 +92,10 @@ modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $d
 
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
+
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_bqsr = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:bqsr_apply", "dir");;
@@ -118,19 +122,66 @@ my $reference     = $Config->read("references", "genome_fasta");
 my $region_bait   = $Config->read("targets", "hs_bait");
 my $region_target = $Config->read("targets", "hs_target");
 
-my $cmd_m = $Config->read("step:$step", "picard_merge_bin");
-my $cmd_s = $Config->read("step:$step", "picard_sort_bin");
-my $cmd_x = $Config->read("step:$step", "picard_metrics_bin");
+my $bin = $Config->read("step:$step", "picard_bin");
+my $cmd_m = "$bin GatherBamFiles";
+my $cmd_s = "$bin SortSam";
+my $cmd_x = "$bin CollectHsMetrics";
+#my $cmd_m = $Config->read("step:$step", "picard_merge_bin");
+#my $cmd_s = $Config->read("step:$step", "picard_sort_bin");
+#my $cmd_x = $Config->read("step:$step", "picard_metrics_bin");
 
+my $r;
 my $cmd = "$cmd_m INPUT=".join(" INPUT=", @files)." OUTPUT=/dev/stdout | $cmd_s MAX_RECORDS_IN_RAM=300000 INPUT=/dev/stdin OUTPUT=$dir_run/$cohort-$individual.bqsr.bam SORT_ORDER=coordinate CREATE_INDEX=true";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-#my $r = $Syscall->run($cmd);
-my $r;
-exit(1) if($r);
-
-$cmd = "$cmd_x TMP_DIR=$dir_tmp I=$dir_run/$cohort-$individual.bqsr.bam O=$dir_run/$cohort-$individual.bammetrics.txt R=$reference BAIT_INTERVALS=$region_bait TARGET_INTERVALS=$region_target PER_TARGET_COVERAGE=$dir_run/$cohort-$individual.exon_cover.tsv";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
+
+$cmd = "$cmd_x TMP_DIR=$dir_tmp I=$dir_run/$cohort-$individual.bqsr.bam O=$dir_run/$cohort-$individual.bammetrics.txt R=$reference BAIT_INTERVALS=$region_bait TARGET_INTERVALS=$region_target PER_TARGET_COVERAGE=$dir_run/$cohort-$individual.target_cover.tsv";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
+my %h;
+open F, "$dir_run/$cohort-$individual.target_cover.tsv"      or modules::Exception->throw("Can't open '$dir_run/$cohort-$individual.target_cover.tsv'");
+open O, ">$dir_run/$cohort-$individual.target_mean_cover.tsv" or modules::Exception->throw("Can't open '$dir_run/$cohort-$individual.target_mean_cover.tsv' for writing");
+undef %h;
+while(<F>){
+	chomp;
+	my @a = split "\t";
+	if(!%h){
+		for(my $i = 0; $i < scalar @a; $i++){
+			#chrom start end length name %gc mean_coverage normalized_coverage min_normalized_coverage max_normalized_coverage min_coverage max_coverage pct_0x read_count
+			$h{$a[$i]} = $i;
+		}
+		print O join("\t", 'chrom', 'start', 'end', 'name_short', '%gc', 'pct_0x', 'mean_coverage')."\n";
+		next;
+	}
+	#clean up duplicated names:
+	my @name = split ",", $a[$h{name}];
+	my %nameu;
+	my($id_ref, $id_miRNA, $id_ens);
+	foreach(@name){
+		$nameu{$_} = 1;
+		$id_ref   = $_ if(/^ref/ && !defined $id_ref);
+		$id_miRNA = $_ if(/^miRNA/ && !defined $id_miRNA);
+		$id_ens   = $_ if(/^ens/ && !defined $id_ens);
+	}
+
+	undef @name;
+	my $name_short = defined $id_ref? $id_ref: defined $id_miRNA? $id_miRNA: defined $id_ens? $id_ens: undef;
+	foreach(sort keys %nameu){
+		push @name, $_;
+	}
+	if(defined $name_short){
+		print O join("\t", $a[$h{chrom}], $a[$h{start}], $a[$h{end}], $name_short, sprintf("%0.2f", $a[$h{'%gc'}]), sprintf("%0.2f", $a[$h{pct_0x}]), sprintf("%0.2f", $a[$h{mean_coverage}]))."\n";
+	}
+}
+close O;
+close F;
+
+#link in results:
+modules::Utils::lns("$dir_run/$cohort-$individual.bqsr.bam", "$dir_result/$cohort-$individual.bqsr.bam");
+modules::Utils::lns("$dir_run/$cohort-$individual.bqsr.bai", "$dir_result/$cohort-$individual.bqsr.bai");
+modules::Utils::lns("$dir_run/$cohort-$individual.target_mean_cover.tsv", "$dir_result/$cohort-$individual.target_mean_cover.tsv");
 
 exit(0);
 

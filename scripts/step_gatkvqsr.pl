@@ -100,7 +100,7 @@ my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_gvcfs = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_genotype_gvcfs", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_gvcfs") if(!-d $dir_gvcfs);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
@@ -144,7 +144,7 @@ sub recal{
 	#get all split vcf files for recalibration, recalibration is run on all spit vcfs together:
 	my @files;
 	foreach(sort keys %{$Config->read("split")}){
-		my $f = "$dir_gvcfs/$cohort.$_.vcf.gz";
+		my $f = "$dir_gvcfs/$cohort.$_.4vqsr.vcf.gz";
 		modules::Exception->throw("Can't access file '$f'") if(!-e $f);
 		modules::Exception->throw("File '$f' is empty") if(!-s $f);
 		push @files, $f;
@@ -181,7 +181,7 @@ sub recal{
 #
 sub apply{
 	my $split_bed   = $Config->read($Config->read("split", $split), "bed");
-	my $filter = $Config->read("step:$step", "filter_level");
+	my $filter = $Config->read("step:$step", "sensitivity_cutoff");
 
 	my $cmd = $Config->read("step:$step", "gatk_bin");
 	my $bcftools = $Config->read("step:$step", "bcftools_bin");

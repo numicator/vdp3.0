@@ -2,6 +2,7 @@
 use strict;
 use Data::Dumper;
 use Getopt::Long;
+use File::Copy qw(cp mv);
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
@@ -27,7 +28,9 @@ GetOptions(\%OPT,
 	   		"cohort=s",
 	   		"individual=s",
 	   		"readfile=s",
-	   		"split=s"
+	   		"split=s",
+	   		"mode=s",
+	   		"exit=s"
 	   		);
 	   		
 pod2usage(-verbose => 2) if $OPT{man};
@@ -38,7 +41,7 @@ pod2usage(1) if ($OPT{help});
 
 =head1 SYNOPSIS
 
-tool_<name>.pl
+step_<name>.pl
 
 Required flags: NONE
 
@@ -51,7 +54,7 @@ Required flags: NONE
 
 =head1 NAME
 
-tool_<name>.pl -> Does something useful
+step_<name>.pl -> Does something useful
 
 =head1 DESCRIPTION
 
@@ -65,16 +68,15 @@ Marcin Adamski
 
 =head1 EXAMPLE
 
-./tool_<name>.pl
+./step_<name>.pl
 
 =cut
 
-
+my $mode       = $OPT{mode};
 my $step       = $OPT{step};
 my $split      = $OPT{'split'};
 my $cohort     = $OPT{cohort};
 my $individual = $OPT{individual};
-my $readfile   = $OPT{readfile};
 
 die("this script requires at least arguments --cohort <cohort> and --step <step>\nrun: $0 --help to hopefully get some brief help\n") if(!defined $cohort | !defined $step);
 
@@ -86,59 +88,60 @@ my $Syscall  = modules::SystemCall->new();
 my $pversion = $Config->read("global", "version");
 my $codebase = $Config->read("directories", "pipeline");
 warn "pipeline version: '$pversion', codebase: '$codebase'\n";
+
 my $dir_cohort = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
+
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
 modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
-my $readfiles = $Config->read($individual, "reads:$readfile");
-$readfiles =~ s/,/ /g;
+my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
+modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
+my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
+my $dir_readcount = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_read_counts", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_readcount") if(!-d $dir_readcount);
+my $dir_ploidy = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_ploidy", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_ploidy") if(!-d $dir_ploidy);
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 
-#my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
-#$Cohort->add_individuals_ped();
+my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+$Cohort->add_individuals_ped();
 #my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
-my $cmd = $Config->read("step:$step", "fastqc_bin");
-my $ncpu = $Config->read("step:$step", "pbs_ncpus");
+my $reference = $Config->read("references", "genome_fasta");
+my $model     = $Config->read("step:$step", "cnv_caller_model");
+my $cmd       = $Config->read("step:$step", "gatk_bin");
 
-$cmd .= " --quiet --threads $ncpu --dir $dir_run --nogroup --extract --outdir $dir_run $readfiles";
+my @files;
+foreach(sort @{$Cohort->individual}){
+	my $indv = $_->id;
+	my $f = "$dir_readcount/$cohort-$indv.tsv";
+	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
+	modules::Exception->throw("File '$f' is empty") if(!-s $f);
+	push @files, $f;
+}
+
+my $r;
+$cmd .= " GermlineCNVCaller --tmp-dir $dir_tmp --contig-ploidy-calls $dir_ploidy/ploidy-calls --model $model --output $dir_run --output-prefix caller -I $dir_readcount/$cohort-$individual.tsv";
+$cmd =~ s/\s+-/ \\\n  -/g;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
-#my $r = 0;
-exit(1) if($r);
-
-my @rd = split " ", $readfiles;
-$rd[0] = basename($rd[0]);
-$rd[1] = basename($rd[1]);
-$rd[0] =~ s/\.f(ast)?q(.gz)?/_fastqc/;
-$rd[1] =~ s/\.f(ast)?q(.gz)?/_fastqc/;
-
-my $sum0  = "$dir_run/$rd[0]/summary.txt";
-my $sum1  = "$dir_run/$rd[1]/summary.txt";
-my $data0 = "$dir_run/$rd[0]/fastqc_data.txt";
-my $data1 = "$dir_run/$rd[1]/fastqc_data.txt";
-my $html1 = "$rd[0].html";
-my $html2 = "$rd[1].html";
-
-#the perl bit below is an equivalent to head -n 11 but it doesn't break pipe as head does. broken pipe would be cought as an error by Syscall->run 
-$cmd = "paste $data0 $data1 | perl -e '\$n=0;while(<>){print \$_ if(\$n++<=11)}' | grep -P \"(^Total)|(^Sequence length)|(^%GC)\" | awk 'BEGIN{FS=\"\\t\"; OFS=FS}{print \$1,\$2,\$4}' >$dir_run/$readfile.summary.txt";
-$r = $Syscall->run($cmd, 1);
-exit(1) if($r && $r != 36096); #the 36096 is actually err 141 caused by head terminating pipe after reading 11 lines
-
-$cmd = "paste $sum0 $sum1 | awk 'BEGIN{FS=\"\\t\"; OFS=FS}{print \$2,\$1,\$4}' >>$dir_run/$readfile.summary.txt";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
 
-#link in results:
-modules::Utils::lns("$dir_run/$html1", "$dir_result/$html1");
-modules::Utils::lns("$dir_run/$html2", "$dir_result/$html2");
+$cmd .= " PostprocessGermlineCNVCalls --tmp-dir $dir_tmp --allosomal-contig chrX --allosomal-contig chrY --contig-ploidy-calls $dir_ploidy/ploidy-calls --sample-index 0 --model-shard-path $dir_run/caller-model --calls-shard-path $dir_run/caller-calls --output-genotyped-intervals $dir_run/genotyped-intervals --output-genotyped-segments $dir_run/genotyped-segments";
+$cmd =~ s/\s+-/ \\\n  -/g;
+#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+$r = $Syscall->run($cmd);
+
+#exit(PIPE_NO_PROGRESS);
+exit(1) if($r);
 
 exit(0);
 

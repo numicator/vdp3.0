@@ -219,6 +219,20 @@ sub isarray{
 	return ref(shift) eq 'ARRAY'? 1: 0
 }#isarray
 
+sub lns{
+	my($old_qfn, $new_qfn) = @_;
+	#https://stackoverflow.com/questions/45872725/does-symlink-function-in-perl-overwrite-an-existing-link
+	if(!symlink($old_qfn, $new_qfn)){
+		if($!{EEXIST}){
+			unlink($new_qfn) or modules::Exception->throw("lns: can't remove \"$new_qfn\": $!\n");
+			symlink($old_qfn, $new_qfn) or modules::Exception->throw("lns: can't create symlink \"$new_qfn\": $!\n");
+		}
+		else{
+			  modules::Exception->throw("lns: can't create symlink \"$new_qfn\": $!\n");
+		}
+	}
+}#lns
+
 sub pbs_qsub{
 	#_pbs_qsub_dummy(@_);
 	_pbs_qsub_actual(@_);

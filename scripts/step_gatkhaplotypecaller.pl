@@ -95,7 +95,7 @@ my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_gather = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:bqsr_gather_bam", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_gather") if(!-d $dir_gather);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
@@ -116,7 +116,7 @@ my $read_filter = $Config->read("step:$step", "read_filter_add");
 $read_filter = ",$read_filter";
 $read_filter =~ s/[,;]/ -RF /g;
 
-my $cmdx .= " --tmp-dir $dir_tmp -R $reference $read_filter --max-alternate-alleles 3 --interval-set-rule INTERSECTION -L $regions -L $split_bed -ERC GVCF -contamination 0 -GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90 -G StandardAnnotation -G StandardHCAnnotation -G AS_StandardAnnotation -I $dir_gather/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.$split.g.vcf.gz";
+my $cmdx .= " HaplotypeCaller --tmp-dir $dir_tmp -R $reference $read_filter --max-alternate-alleles 3 --interval-set-rule INTERSECTION -L $regions -L $split_bed -ERC GVCF -contamination 0 -GQB 10 -GQB 20 -GQB 30 -GQB 40 -GQB 50 -GQB 60 -GQB 70 -GQB 80 -GQB 90 -G StandardAnnotation -G StandardHCAnnotation -G AS_StandardAnnotation -I $dir_gather/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.$split.g.vcf.gz";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);

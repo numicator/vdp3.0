@@ -145,7 +145,7 @@ sub submit_step{
 sub check_current_step{
 	my($self, $step_current) = @_;
 	#warn "***************** UNDEF $step_current ***********************\n"; undef $step_current;
-	warn "provided step '$step_current'\n" if(defined $step_current);
+	#warn "provided step '$step_current'\n" if(defined $step_current);
 
 	my $step_completed;
 	my $pipe_stop_signal = 0;
@@ -170,13 +170,13 @@ sub check_current_step{
 		modules::Exception->throw("Couldn't find pipeline step $_ in the list of pipesteps") if(!defined $step);
 
 		#warn "checking step $qsubs{$_} (#$_): $pipesteps->[$step][0]\n";
-		warn "checking step $qsubs{$_} ($pipesteps->[$step][0]): \n";
+		warn " checking step $qsubs{$_} ($pipesteps->[$step][0]): \n";
 		my $qfiles = $self->config->read("qsubs", $qsubs{$_});
 		my $status_step = 1;
 	
 		foreach(@$qfiles){
 			my($status, $status_code) = $self->qsub_status($_);
-			warn "  ".basename($_)." $status\t".(defined $status_code? $status_code: '')."\n";
+			warn "  ".basename($_)." $status\t".(defined $status_code? $status_code: '')."\n" if($status_code);
 			$pipe_stop_signal = 1 if(defined $status_code && $status_code =~ /^\d+$/ && $status_code == PIPE_STOP);
 			if($status ne JOB_COMPLETED){
 				$status_step = 0;
@@ -190,18 +190,18 @@ sub check_current_step{
 			$status_step = 0;
 		}
 		$step_completed = $step if($status_step);
-		warn "step status: ".($status_step? "": "NOT ")."COMPLETED\n";
+		warn " step status: ".($status_step? "": "NOT ")."COMPLETED\n";
 		last if(!$status_step); #to stop checking steps after current step not completed
 	}#foreach(sort{$a <=> $b} keys %qsubs)
 
 	my $step_next = -1;
 	if(defined $step_completed){
 		$step_next = $step_completed + 1 if($step_completed + 1 < scalar @$pipesteps);
-		warn "completed step: $pipesteps->[$step_completed][0]=$pipesteps->[$step_completed][1]\n";
+		warn " completed step: $pipesteps->[$step_completed][0]=$pipesteps->[$step_completed][1]\n";
 	}
 	else{
 		$step_next = 0;
-		warn "no step has completed yet\n";
+		warn " no step has completed yet\n";
 	}
 	warn "step to run: $pipesteps->[$step_next][0]=$pipesteps->[$step_next][1]\n" if($step_next > -1);
 	

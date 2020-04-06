@@ -95,9 +95,9 @@ my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_bam = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_bam", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_bam") if(!-d $dir_bam);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
-my $samples = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/samples.txt';
+my $samples = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/samples.txt';
 modules::Exception->throw("Can't access samples list file $samples") if(!-e $samples);
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
@@ -127,12 +127,12 @@ remove_tree("$dir_run/$split");
 make_path("$dir_run/$split");
 
 #prepare merged bad with split and calling regions:
-my $cmd = $Config->read("step:$step", "bedintersect_bin");
+my $cmd = $Config->read("step:$step", "bedtools_bin");
 my $cmd_bgzip = $Config->read("step:$step", "bgzip_bin");
 my $cmd_bcftools = $Config->read("step:$step", "bcftools_bin");
 my $cmd_tabix = $Config->read("step:$step", "tabix_bin");
 my $bedsplit = $Config->read($Config->read("split", "$split"), "bed");
-$cmd = "$cmd -a $regions -b $bedsplit | $cmd_bgzip -c >$dir_run/$split/regions.$split.bed.gz";
+$cmd = "$cmd intersect -a $regions -b $bedsplit | $cmd_bgzip -c >$dir_run/$split/regions.$split.bed.gz";
 my $r = $Syscall->run($cmd);
 exit(1) if($r);
 $cmd = "$cmd_tabix -f $dir_run/$split/regions.$split.bed.gz";

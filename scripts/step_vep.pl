@@ -91,6 +91,8 @@ my $dir_cohort  = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 
@@ -132,7 +134,7 @@ my $ncpu         = $Config->read("step:$step", "pbs_ncpus");
 #my $cosmic_noncoding_vcf = $Config->read("step:$step", "cosmic_noncoding_vcf");
 #--custom $cosmic_coding_vcf,COSMIC_CODING,vcf,exact,0,LEGACY_ID --custom $cosmic_noncoding_vcf,COSMIC_NONCODING,vcf,exact,0,LEGACY_ID 
 
-$cmd = "--force_overwrite --cache --offline --species homo_sapiens --merged --fork $ncpu --domains --af --pubmed --check_existing --biotype --regulatory --hgvs --numbers --symbol --canonical --sift b --polyphen b --flag_pick --vcf --use_transcript_ref --plugin SpliceRegion --plugin CADD,$cad --custom $clinvar_vcf,ClinVar,vcf,exact,0,CLNSIG,CLNREVSTAT,CLNDN --custom $gnomad_vcf,gnomAD,vcf,exact,0,AF,AF_female,AF_male,AF_afr,AF_afr_female,AF_afr_male,AF_ami,AF_ami_female,AF_ami_male,AF_amr,AF_amr_female,AF_amr_male,AF_asj,AF_asj_female,AF_asj_male,AF_eas,AF_eas_female,AF_eas_male,AF_fin,AF_fin_female,AF_fin_male,AF_nfe,AF_nfe_female,AF_nfe_male,AF_sas,AF_sas_female,AF_sas_male,AF_oth,AF_oth_female,AF_oth_male --dir $index_dir --fasta $fasta --I $dir_run/$cohort.$split.vep_in.vcf --stats_text --stats_file $dir_run/$cohort.$split.vep_stats.txt -o stdout | $bgzip_bin -c >$dir_run/$cohort.$split.vep.vcf.gz";
+$cmd = "--force_overwrite --cache --offline --species homo_sapiens --merged --fork $ncpu --domains --af --pubmed --check_existing --biotype --regulatory --hgvs --numbers --symbol --canonical --sift b --polyphen b --flag_pick --af_gnomad --vcf --use_transcript_ref --plugin SpliceRegion --plugin CADD,$cad --custom $clinvar_vcf,ClinVar,vcf,exact,0,CLNSIG,CLNREVSTAT,CLNDN --custom $gnomad_vcf,gnomAD3,vcf,exact,0,AF,AF_female,AF_male,AF_afr,AF_afr_female,AF_afr_male,AF_ami,AF_ami_female,AF_ami_male,AF_amr,AF_amr_female,AF_amr_male,AF_asj,AF_asj_female,AF_asj_male,AF_eas,AF_eas_female,AF_eas_male,AF_fin,AF_fin_female,AF_fin_male,AF_nfe,AF_nfe_female,AF_nfe_male,AF_sas,AF_sas_female,AF_sas_male,AF_oth,AF_oth_female,AF_oth_male --dir $index_dir --fasta $fasta --I $dir_run/$cohort.$split.vep_in.vcf --stats_text --stats_file $dir_run/$cohort.$split.vep_stats.txt -o stdout | $bgzip_bin -c >$dir_run/$cohort.$split.vep.vcf.gz";
 $cmd =~ s/\s+-/ \\\n  -/g;
 $cmd = "$vep_bin $cmd";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
@@ -245,7 +247,7 @@ while(<I>){
 				$ad1 += $a1;
 				$rd  += $a0 + $a1;
 			}
-			if($rd > 0){ #in some multiallelic cases strelka reports variants with 0 read support for the allele (facepalm)
+			if($rd > 0){ #in some multiallelic cases gatk-hc abd strelka report variants with 0 read support for an allele, I am not sure why, but here we get rid of them
 				print O join("\t", $fld[0], $fld[1], $fld[3], $fld[4])."\t$rd\t$ad0\t$ad1\t".join("\t", @gt)."\t".join("\t", @gq)."\t".join("\t", @rds)."\t".join("\t", @ad0)."\t".join("\t", @ad1)."\t$caller\t$vqslod\t$mq";
 				print O "\t$csqs[$i]\n";
 			}

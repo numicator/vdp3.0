@@ -91,10 +91,12 @@ my $dir_cohort  = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_peddy = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "peddy_dir");
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
@@ -183,13 +185,15 @@ while(<I>){
 	chomp;
 	my @a = split "\t";
 
-	my($is_cvrok, $is_snp, $is_known, $is_multi, $is_ti, $is_coding);
+	my($is_cvrok, $is_snp, $is_known, $is_multi, $is_ti, $is_coding, $caller);
 
 	$is_cvrok  = $a[$fld_RD] >= $filter_rd_cvr? 1: 0;
 	$is_coding = (defined $a[$fld_Protein_position] && $a[$fld_Protein_position] ne '') || (defined $a[$fld_Consequence] && $a[$fld_Consequence] =~ /splice_/)? 1: 0;
 	
 	#stats are calculated only for filtered variants:
 	if($is_cvrok){
+		$caller = $a[$fld_caller];
+		$stats{$caller}++;
 		#flags describing the variant:
 		$is_snp   = length($a[$fld_ref]) == 1 && length($a[$fld_alt]) == 1? 1: 0;
 		$is_known = defined $a[$fld_Existing_variation] && $a[$fld_Existing_variation] ne ''? 1: 0;
@@ -333,9 +337,9 @@ $cmd = "$picard_bin BedToIntervalList SD=$dict I=$regions O=$dir_run/$cohort.int
 $r = $Syscall->run($cmd);
 exit(1) if($r);
 
-#picard CollectVariantCallingMetrics chokes on calls done by Varscan, most likely due to the way how AD tag is being used
-#for not I just filter out Varscan only calls from the set; it means the metrics don't use theapprox 1.5% of calls done by Varscan
-#it should be addressed properly in the future and get rid of the code below
+#picard CollectVariantCallingMetrics chokes on calls done by Varscan, most likely due to the way the AD tag is being used for not I just 
+#filter out Varscan-only calls from the set; it means the metrics don't use the approx 1.5% of calls done by Varscan it should be addressed 
+#properly in the future and got rid of the code below. Anyway, it's ONLY for the metrics, Varscan results are still properly reported
 #BTW, we can't pipe, we need an intermediate vcf.gz as we need tabix index:
 $cmd = "$bgzip_bin -dc $dir_run/$cohort.vcf.gz | grep -v \"caller=varscan;\" | $bgzip_bin -c >$dir_run/$cohort.metrics_in.vcf.gz";
 $r = $Syscall->run($cmd);
@@ -354,7 +358,7 @@ unlink("$dir_run/$cohort.metrics_in.vcf.gz.tbi");
 
 warn "running peddy\n";
 make_path("$dir_peddy");
-$cmd = "$peddy_bin --plot --sites hg38 --prefix $dir_peddy/$cohort $dir_run/$cohort.vcf.gz $dir_cohort/$cohort.ped";
+$cmd = "$peddy_bin --procs 1 --plot --sites hg38 --prefix $dir_peddy/$cohort $dir_run/$cohort.vcf.gz $dir_cohort/$cohort.ped";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
 
@@ -372,6 +376,20 @@ exit(1) if($r);
 $cmd = "$pcaplot_bin $dir_peddy/$cohort.background_pca.tsv $dir_peddy/$cohort.pca.tsv";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
+
+#link in results:
+#VCF no VEP annotation
+modules::Utils::lns("$dir_run/$cohort.vcf.gz", "$dir_result/$cohort.vcf.gz");
+modules::Utils::lns("$dir_run/$cohort.vcf.gz.tbi", "$dir_result/$cohort.vcf.gz.tbi");
+#VCF with VEP annotation
+modules::Utils::lns("$dir_run/$cohort.vep.vcf.gz", "$dir_result/$cohort.vep.vcf.gz");
+modules::Utils::lns("$dir_run/$cohort.vep.vcf.gz.tbi", "$dir_result/$cohort.vep.vcf.gz.tbi");
+#TSV report complete, all variants
+modules::Utils::lns("$dir_run/$cohort.vep_all.tsv.gz", "$dir_result/$cohort.vep_all.tsv.gz");
+modules::Utils::lns("$dir_run/$cohort.vep_all.tsv.gz.tbi", "$dir_result/$cohort.vep_all.tsv.gz.tbi");
+#TSV report coding, only variants affecting coding sequence - exonic and splice-regions
+modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz", "$dir_result/$cohort.vep_coding.tsv.gz");
+modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz.tbi", "$dir_result/$cohort.vep_coding.tsv.gz.tbi");
 
 exit(0);
 

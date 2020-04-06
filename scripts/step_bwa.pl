@@ -116,7 +116,7 @@ my $id = "$individual-$readfile";
 my $sm = "$individual";
 my $rg = "\"\@RG\\tID:$id\\tSM:$sm\\tLB:$sm\\tPL:ILLUMINA\""; #we are assuming ONE library per idividual (sample), if not true it will affect MarkDuplicates making marking more stringent
 
-$cmd .= " mem -M -t $ncpu -R $rg $reference $readfiles | $cmd_p MAX_RECORDS_IN_RAM=300000 INPUT=/dev/stdin OUTPUT=$dir_run/$cohort-$individual-$readfile.bam SORT_ORDER=coordinate CREATE_INDEX=true";
+$cmd .= " mem -M -t $ncpu -R $rg $reference $readfiles | $cmd_p SortSam MAX_RECORDS_IN_RAM=300000 INPUT=/dev/stdin OUTPUT=$dir_run/$cohort-$individual-$readfile.bam SORT_ORDER=coordinate CREATE_INDEX=true";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);
 exit(1) if($r);

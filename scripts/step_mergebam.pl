@@ -113,7 +113,7 @@ foreach(keys %{$Config->read($individual)}){
 	modules::Exception->throw("Can't access bam file $bam") if(!-e $bam);
 	push @bams, $bam;
 }
-$cmd .= " TMP_DIR=$dir_tmp MAX_RECORDS_IN_RAM=300000 CREATE_INDEX=true O=$dir_run/$cohort-$individual.bwa.bam I=".join(" I=",@bams);
+$cmd .= " MergeSamFiles TMP_DIR=$dir_tmp MAX_RECORDS_IN_RAM=300000 CREATE_INDEX=true O=$dir_run/$cohort-$individual.bwa.bam I=".join(" I=",@bams);
 
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);

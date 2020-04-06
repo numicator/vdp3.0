@@ -93,6 +93,8 @@ my $dir_cohort  = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_fastqc = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:fastqc", "dir");
@@ -224,7 +226,8 @@ my $cohort_data = [
 	['Cohort Name', $cohort],
 	['Pipeline Ver. and Run Dir', $Config->read("global", "version")."   $dir_cohort"],
 	['Start/Finish Time', "$time_start / $timestamp"],
-	['Operator in Charge', "$username"]
+	['Piper', "$username"]
+	#['Operator in Charge', "$username"]
 ];
 
 my $individual_data = [
@@ -445,7 +448,11 @@ foreach(@{$Pipeline->pipesteps}){
 ($final_page, $number_of_pages, $final_y) = table(\@db_data, $final_y - 8);
 ($final_page, $number_of_pages, $final_y) = table(\@step_data, $final_y - 8, 8, 2);
 
-$pdf->save(); 
+$pdf->save();
+
+#link in results:
+modules::Utils::lns("$dir_run/$cohort\_summary.pdf", "$dir_result/$cohort\_summary.pdf");
+
 exit(0);
 
 sub table{

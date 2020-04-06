@@ -94,7 +94,7 @@ my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 my $dir_mdupl   = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:mark_duplicates", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_mdupl") if(!-d $dir_mdupl);
-my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:target_merge", "dir").'/regions.bed';
+my $regions = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_target", "dir").'/regions.bed';
 modules::Exception->throw("Can't access call regions file $regions") if(!-e $regions);
 
 my $split_bed = $Config->read($Config->read("split", $split), "bed");
@@ -113,7 +113,7 @@ my $reference = $Config->read("references", "genome_fasta");
 my $sites     = $Config->read("references", "bqsr_known_sites");
 $sites =~  s/[;,]/ --known-sites /g;
 
-my $cmdx = " --tmp-dir $dir_tmp -R $reference --known-sites $sites --interval-set-rule INTERSECTION -L $regions -L $split_bed -I $dir_mdupl/$cohort-$individual.duplicatemarked.bam -O $dir_run/$cohort-$individual.$split.recal_data.tbl";
+my $cmdx = " BaseRecalibrator --tmp-dir $dir_tmp -R $reference --known-sites $sites --interval-set-rule INTERSECTION -L $regions -L $split_bed -I $dir_mdupl/$cohort-$individual.duplicatemarked.bam -O $dir_run/$cohort-$individual.$split.recal_data.tbl";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmd .= $cmdx;
 

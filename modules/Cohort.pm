@@ -149,7 +149,7 @@ sub make_workdir{
 	#copy read files from their original loacation (from Vardb object) to cohort work location
 	if(defined $self->{fqfiles}){
 		foreach my $smpl(keys %{$self->{fqfiles}}){
-			warn "  $smpl - coping fastq files\n";
+			warn "  $smpl - copying fastq files\n";
 			foreach(@{$self->{fqfiles}->{$smpl}}){
 				warn "    ".basename($_->[0]). " ".basename($_->[1])."\n";
 				if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])){

@@ -92,8 +92,10 @@ my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->r
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_merge_bam = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:merge_bam", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_merge_bam") if(!-d $dir_merge_bam);
+my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
+my $dir_bam = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:bqsr_gather_bam", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_bam") if(!-d $dir_bam);
 
 #my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 #modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
@@ -104,9 +106,10 @@ modules::Exception->throw("Can't access cohort run directory $dir_merge_bam") if
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
-my $cmd = $Config->read("step:$step", "picard_bin");
-$cmd .= " MarkDuplicates TMP_DIR=$dir_tmp MAX_RECORDS_IN_RAM=300000 OPTICAL_DUPLICATE_PIXEL_DISTANCE=2500 VALIDATION_STRINGENCY=LENIENT CREATE_INDEX=true I=$dir_merge_bam/$cohort-$individual.bwa.bam O=$dir_run/$cohort-$individual.duplicatemarked.bam M=$dir_run/$cohort-$individual.duplicatemetrics.txt";
+my $reference = $Config->read("references", "genome_fasta");
+my $cmd       = $Config->read("step:$step", "gatk_bin");
 
+$cmd .= " CollectReadCounts --tmp-dir $dir_tmp -R $reference -L $dir_interval/targets_preprocessed.interval_list -imr OVERLAPPING_ONLY --format TSV -I $dir_bam/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.tsv";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);
 exit(1) if($r);

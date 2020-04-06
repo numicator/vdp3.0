@@ -25,8 +25,8 @@ BEGIN{
 		QJOB_ONHOLD   => 5,
 		QJOB_NOSTATUS => 99,
 
-		JOB_MAX_RERUNS => 2,
-		JOB_MAX_RESUB  => 8,
+		JOB_MAX_RERUNS => 10,
+		JOB_MAX_RESUB  => 10,
 		
 		PIPE_STOP        => 88,
 		PIPE_NO_PROGRESS => 66,
