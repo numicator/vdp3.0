@@ -3,9 +3,10 @@ package modules::Semaphore;
 use strict;
 use POSIX;
 use File::Basename;
-use Fcntl ':flock';
+use Fcntl;
 use IO::Handle;
 use Sys::Hostname;
+use modules::Definitions;
 use modules::Exception;
 use modules::Utils;
 
@@ -14,15 +15,13 @@ sub new{
 
 	my $self = bless {}, $class;
 	$self->{file_name} = $file_name . $self->file_suffix;
-	open($self->{file_handle}, ">>", $self->file_name) or modules::Exception->throw("Can't open semaphore file '".$self->file_name."' for writing");
-	$self->fh->autoflush(1);
 	return $self;
 }
 
 sub DESTROY
 {  
 	my($self) = shift;
-	close $self->fh;
+	close $self->fh if($self->fh);
 }#DESTROY
 
 sub locked{
@@ -32,18 +31,13 @@ sub locked{
 
 sub fh{
 	my($self) = shift;
-	return $self->file_handle
+	return $self->{fh}
 }#fh
 
 sub file_suffix{
 	my($self) = shift;
-	return '.semaphore'
+	return '.lock'
 }#file_suffix
-
-sub file_handle{
-	my($self) = shift;
-	return $self->{file_handle}
-}#file_handle
 
 sub file_name{
 	my($self) = shift;
@@ -51,40 +45,70 @@ sub file_name{
 }#file_name
 
 sub lock{
-	my($self, $non_blocking) = shift;
+	my($self, $waitforit) = @_;
 	my $ret = 0;
 	
-	$non_blocking = !defined $non_blocking || $non_blocking != 0? LOCK_NB: 0;
+	my $ok;
+	my $fh;
+	warn "will be waiting...\n" if($waitforit);
+	print STDERR "waiting to lock lockfile ".basename($self->{file_name})."...";
+	for(;;){
+		$ok = sysopen(FH, $self->{file_name}, O_CREAT | O_EXCL | O_WRONLY);
+		if(!$ok){
+			if(open(F, $self->{file_name})){
+				my $modtime = (stat(F))[9];
+				my $age = time - $modtime;
+				print STDERR " lock file age: $age"."s (max allowed age is ".LOCK_MAX_AGE."s)," if(!defined $waitforit);
+				if($age > LOCK_MAX_AGE){
+					print STDERR " lock file considered stale, overriding and retrying,";
+					close F;
+					unlink($self->{file_name});
+					next;
+				}
+				close F;
+			}
+		}
+		if(!$ok && defined $waitforit){
+			sleep(1);
+			print STDERR ".";
+			next
+		}
+		else{
+			last
+		}
+	}
+
+	$ret = $ok? 1: 0;
 	
-	if(flock($self->fh, LOCK_EX | LOCK_NB)){
-		warn basename($self->file_name)." locked\n";
-		#print $fh POSIX::strftime("%d-%m-%Y_%H:%M:%S", localtime)."\tLOCK\t".(defined $ENV{'PBS_JOBID'}?$ENV{'PBS_JOBID'}: 'NOT_PBS')."\t".hostname()."\n";
-		my $fh = $self->fh;
-		print $fh "".modules::Utils::get_time_stamp."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\t".modules::Utils::username."\n";
-		$ret = 1;
-	}
+	if($ok){
+		warn " locked\n";	}
 	else{
-		warn $self->file_name." failed to lock with '$!'\n";
+		warn " failed to lock\n";
+		return $ret;
 	}
+	
+	$fh = (*FH);
+	$fh->autoflush(1);
+	$self->{fh} = $fh;
 	$self->{locked} = $ret;
+	print FH "".modules::Utils::get_time_stamp."\tLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\t".modules::Utils::username."\n";
+
 	return $ret;
 }#lock
 
 sub unlock{
 	my($self, $force) = @_;
-	my $ret = 0;
+	my $ret = 1;
 	
 	return if(!$self->{locked} && !$force);
 	
-	if(flock($self->fh, LOCK_UN)){
-		warn basename($self->file_name)." unlocked\n";
-		my $fh = $self->fh;
-		print $fh "".modules::Utils::get_time_stamp()."\tUNLOCK\t".(defined modules::Utils::pbs_jobid()? modules::Utils::pbs_jobid(): 'NOT_PBS')."\t".modules::Utils::hostname()."\t".modules::Utils::username."\n";
-		$self->{locked} = 0;
-		$ret = 1;
+	if($self->fh){
+		close $self->fh;
+		unlink $self->file_name;
+		warn "lock file ".basename($self->file_name)." released\n";
 	}
 	else{
-		warn $self->file_name." failed to unlock with '$!'\n";
+		warn "attempt to release non-existing lock file\n";
 	}
 	return $ret;
 }#unlock

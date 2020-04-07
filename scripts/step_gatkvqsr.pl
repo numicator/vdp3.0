@@ -144,7 +144,7 @@ sub recal{
 	#get all split vcf files for recalibration, recalibration is run on all spit vcfs together:
 	my @files;
 	foreach(sort keys %{$Config->read("split")}){
-		my $f = "$dir_gvcfs/$cohort.$_.4vqsr.vcf.gz";
+		my $f = "$dir_gvcfs/$cohort.$_.all.vcf.gz";
 		modules::Exception->throw("Can't access file '$f'") if(!-e $f);
 		modules::Exception->throw("File '$f' is empty") if(!-s $f);
 		push @files, $f;
@@ -155,7 +155,7 @@ sub recal{
 	foreach my $g(@gausses){
 		warn "running with --max-gaussians $g\n";
 		my $cmd = $Config->read("step:$step", "gatk_bin");
-		my $cmdx = " VariantRecalibrator -mode $mode --tmp-dir $dir_tmp -R $reference -L $regions $tranche $annotation $resources --max-gaussians $g --trust-all-polymorphic -V ".join(" -V ", @files)." --tranches-file $dir_run/$cohort.$mode.tranches -O $dir_run/$cohort.$mode.recall.vcf.gz";
+		my $cmdx = " VariantRecalibrator -mode $mode --tmp-dir $dir_tmp -R $reference -L $regions $tranche $annotation $resources --max-gaussians $g --trust-all-polymorphic -V ".join(" -V ", @files)." --tranches-file $dir_run/$cohort.$mode.all.tranches -O $dir_run/$cohort.$mode.recall.all.vcf.gz";
 		$cmdx =~ s/\s+-/ \\\n  -/g;
 		$cmd .= $cmdx;
 		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
@@ -180,6 +180,7 @@ sub recal{
 # ApplyVQSR
 #
 sub apply{
+	my $reference   = $Config->read("references", "genome_fasta");
 	my $split_bed   = $Config->read($Config->read("split", $split), "bed");
 	my $filter = $Config->read("step:$step", "sensitivity_cutoff");
 
@@ -187,22 +188,38 @@ sub apply{
 	my $bcftools = $Config->read("step:$step", "bcftools_bin");
 	my $tabix    = $Config->read("step:$step", "tabix_bin");
 
-	my $variant = $mode eq 'INDEL'? "$dir_gvcfs/$cohort.$split.vcf.gz": "$dir_run/$cohort.$split.INDEL.vqsr.vcf.gz";
-	my $fo      = "$dir_run/".($mode eq 'INDEL'? "$cohort.$split.$mode.vqsr.vcf.gz": "$cohort.$split.vqsr.vcf.gz");
+	my $variant = $mode eq 'INDEL'? "$dir_gvcfs/$cohort.$split.all.vcf.gz": "$dir_run/$cohort.$split.INDEL.all.vqsr.vcf.gz";
+	my $fo      = "$dir_run/".($mode eq 'INDEL'? "$cohort.$split.$mode.all.vqsr.vcf.gz": "$cohort.$split.all.vqsr.vcf.gz");
 	my $fout    = $mode eq 'INDEL'? $fo: "/dev/stdout | $bcftools view -f PASS -O z - -o $fo";
 
 	modules::Exception->throw("'$variant' file not found - this step must be first run in -mode INDEL and only then in -mode SNP") if($mode eq 'SNP' && !-e $variant);
 
+	my @indv;
+	foreach(sort @{$Cohort->individual}){
+		push @indv, $_->id;
+	}
+	my $r;
 	#--create-output-variant-index true
-	my $cmdx = " ApplyVQSR -mode $mode --tmp-dir $dir_tmp -L $regions -L $split_bed --truth-sensitivity-filter-level $filter --create-output-variant-index false --tranches-file $dir_run/$cohort.$mode.tranches --recal-file $dir_run/$cohort.$mode.recall.vcf.gz -V $variant -O $fout";
+	my $cmdx = " ApplyVQSR -mode $mode --tmp-dir $dir_tmp -L $regions -L $split_bed --truth-sensitivity-filter-level $filter --create-output-variant-index false --tranches-file $dir_run/$cohort.$mode.all.tranches --recal-file $dir_run/$cohort.$mode.recall.all.vcf.gz -V $variant -O $fout";
 	$cmdx =~ s/\s+-/ \\\n  -/g;
 	$cmd .= $cmdx;
 	#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-	my $r = $Syscall->run($cmd);
+	$r = $Syscall->run($cmd);
 	exit(1) if($r);
 	$cmd = "$tabix -f $fo";
 	$r = $Syscall->run($cmd);
 	exit(1) if($r);
+	
+	#select samples and variants from the cohort
+	if($mode eq 'SNP'){
+		$cmd = $Config->read("step:$step", "gatk_bin");
+		$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.all.vqsr.vcf.gz -O $dir_run/$cohort.$split.vqsr.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true --remove-unused-alternates true";
+		$cmdx =~ s/\s+-/ \\\n  -/g;
+		$cmd .= $cmdx;
+		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+		$r = $Syscall->run($cmd);
+		exit(1) if($r);
+	}
 }#apply
 
 END{

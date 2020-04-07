@@ -114,10 +114,10 @@ foreach my $cohort(@cohorts){
 	my $Semaphore = modules::Semaphore->new($smp_name);
 	$smp_name = $Semaphore->file_name;
 	if(! $Semaphore->lock){
-		warn "couldn't apply lock to semaphore file '$smp_name' meaning another ".basename(__FILE__)." is curently running on cohort $cohort; backing off\n";
+		warn "couldn't apply lock to semaphore file '".basename($smp_name)."' meaning another ".basename(__FILE__)." is curently running on cohort $cohort; backing off\n";
 		next;
 	}
-	
+	#warn "sleeping...\n";	sleep(60);	warn "up again!\n";
 	my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 	modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 	modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);

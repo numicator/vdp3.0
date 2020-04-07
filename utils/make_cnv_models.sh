@@ -23,19 +23,20 @@ for split in 01 02 03 04 05 06 07 08 09 10; do
 
   tsvs=""
   for f in ccg_cohort00*/run/gatk_cnv/ccg_cohort00*.tsv; do
+  #for f in ccg_cohort00{01,03,05,07,09,11,13,15,17}/run/gatk_cnv/ccg_cohort00*.tsv; do
     tsvs="$tsvs -I $f"
   done
 
   echo "
 #!/bin/bash
 #PBS -P u86
-#PBS -q normal
-#PBS -l walltime=48:00:00,mem=32GB,ncpus=8,jobfs=100GB
+#PBS -q hugemem
+#PBS -l walltime=48:00:00,mem=1024GB,ncpus=8,jobfs=256GB
 #PBS -l storage=gdata/u86+gdata/xx92
 #PBS -l other=gdata
 #PBS -W umask=0007
-#PBS -o /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller.$split.out
-#PBS -e /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/.GermlineCNVCaller$split.err
+#PBS -o /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller_large.$split.out
+#PBS -e /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller_large.$split.err
 
 module load java/jdk-13.33 python3-as-python
 cd /g/data/xx92/data/vdp3.0/
@@ -59,9 +60,9 @@ $tsvs
 --tmp-dir /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/tmp \
 --contig-ploidy-calls /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ploidy_WES-calls/ \
 --output /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ \
---output-prefix caller_WES.$split \
+--output-prefix caller_large_WES.$split \
 $tsvs
-" >/g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller.$split.qsub
+" >/g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller_large.$split.qsub
   
   qsub /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller.$split.qsub
 done

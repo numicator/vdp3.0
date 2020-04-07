@@ -121,7 +121,7 @@ foreach(sort @{$Cohort->individual}){
 
 my $r = 0;
 my $cmdx;
-$cmdx = " GenotypeGVCFs --tmp-dir $dir_tmp -R $reference --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -G StandardAnnotation -G AS_StandardAnnotation --only-output-calls-starting-in-intervals true -V gendb://$dir_gvcfs/$cohort.$split.gdb -O $dir_run/$cohort.$split.4vqsr.vcf.gz";
+$cmdx = " GenotypeGVCFs --tmp-dir $dir_tmp -R $reference --merge-input-intervals true --interval-set-rule INTERSECTION -L $regions -L $split_bed -G StandardAnnotation -G AS_StandardAnnotation --only-output-calls-starting-in-intervals true -V gendb://$dir_gvcfs/$cohort.$split.gdb -O $dir_run/$cohort.$split.all.vcf.gz";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmdx = "$cmd $cmdx";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
@@ -129,7 +129,7 @@ $r = $Syscall->run($cmdx);
 exit(1) if($r);
 
 #warn "select samples and variants from the cohort\n";
-$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.4vqsr.vcf.gz -O $dir_run/$cohort.$split.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true --remove-unused-alternates true";
+$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.all.vcf.gz -O $dir_run/$cohort.$split.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true --remove-unused-alternates true";
 $cmdx =~ s/\s+-/ \\\n  -/g;
 $cmdx = "$cmd $cmdx";
 $r = $Syscall->run($cmdx);
