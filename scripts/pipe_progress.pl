@@ -117,7 +117,6 @@ foreach my $cohort(@cohorts){
 		warn "couldn't apply lock to semaphore file '".basename($smp_name)."' meaning another ".basename(__FILE__)." is curently running on cohort $cohort; backing off\n";
 		next;
 	}
-	#warn "sleeping...\n";	sleep(60);	warn "up again!\n";
 	my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 	modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 	modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
@@ -125,21 +124,21 @@ foreach my $cohort(@cohorts){
 	my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
 	if($Cohort->has_completed){
 		warn "cohort '$cohort' has already completed the pipeline\n";
-		next;
-	}
-	$Cohort->add_individuals_ped();
-	#my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
-	$Pipeline->set_cohort(cohort => $Cohort);
-	$Pipeline->get_pipesteps;
-	#$Pipeline->get_qjobs;
-	warn "running Pipeline->check_current_step('".(defined $OPT{step}? $OPT{step}: '')."')\n";
-	my($step_completed, $step_next) = $Pipeline->check_current_step($OPT{step});
-	if(defined $OPT{no_submit}){
-		warn "no job submissions by user's request\n";
 	}
 	else{
-		$Pipeline->submit_step($step_next) if(defined $step_next);
-	}
+		$Cohort->add_individuals_ped();
+		$Pipeline->set_cohort(cohort => $Cohort);
+		$Pipeline->get_pipesteps;
+		#$Pipeline->get_qjobs;
+		warn "running Pipeline->check_current_step('".(defined $OPT{step}? $OPT{step}: '')."')\n";
+		my($step_completed, $step_next) = $Pipeline->check_current_step($OPT{step});
+		if(defined $OPT{no_submit}){
+			warn "no job submissions by user's request\n";
+		}
+		else{
+			$Pipeline->submit_step($step_next) if(defined $step_next);
+		}
+	}#if($Cohort->has_completed)
 	$Semaphore->unlock;
 }#foreach(@cohorts)
 

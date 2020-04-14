@@ -50,7 +50,7 @@ sub lock{
 	
 	my $ok;
 	my $fh;
-	warn "will be waiting...\n" if($waitforit);
+	#warn "will be waiting...\n" if($waitforit);
 	print STDERR "waiting to lock lockfile ".basename($self->{file_name})."...";
 	for(;;){
 		$ok = sysopen(FH, $self->{file_name}, O_CREAT | O_EXCL | O_WRONLY);

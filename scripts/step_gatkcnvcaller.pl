@@ -98,8 +98,8 @@ my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
 modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
+#my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
+#modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
 my $dir_readcount = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_read_counts", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_readcount") if(!-d $dir_readcount);
 my $dir_ploidy = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_ploidy", "dir");
@@ -119,28 +119,20 @@ my $reference = $Config->read("references", "genome_fasta");
 my $model     = $Config->read("step:$step", "cnv_caller_model");
 my $cmd       = $Config->read("step:$step", "gatk_bin");
 
-my @files;
-foreach(sort @{$Cohort->individual}){
-	my $indv = $_->id;
-	my $f = "$dir_readcount/$cohort-$indv.tsv";
-	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
-	modules::Exception->throw("File '$f' is empty") if(!-s $f);
-	push @files, $f;
-}
-
 my $r;
-$cmd .= " GermlineCNVCaller --tmp-dir $dir_tmp --contig-ploidy-calls $dir_ploidy/ploidy-calls --model $model --output $dir_run --output-prefix caller -I $dir_readcount/$cohort-$individual.tsv";
-$cmd =~ s/\s+-/ \\\n  -/g;
-#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-$r = $Syscall->run($cmd);
+
+my $cmdx;
+$cmdx = "mkdir -p \$PBS_JOBFS/tmp; cp -a $dir_ploidy/$cohort-$individual\_ploidy-calls \$PBS_JOBFS; cp -a $model.$split-model \$PBS_JOBFS; echo '\$PBS_JOBFS'; ls -l \$PBS_JOBFS";
+#warn "$cmdx\n"; exit(PIPE_NO_PROGRESS);
+$r = $Syscall->run($cmdx);
 exit(1) if($r);
 
-$cmd .= " PostprocessGermlineCNVCalls --tmp-dir $dir_tmp --allosomal-contig chrX --allosomal-contig chrY --contig-ploidy-calls $dir_ploidy/ploidy-calls --sample-index 0 --model-shard-path $dir_run/caller-model --calls-shard-path $dir_run/caller-calls --output-genotyped-intervals $dir_run/genotyped-intervals --output-genotyped-segments $dir_run/genotyped-segments";
+$model = basename($model);
+
+$cmd .= " GermlineCNVCaller --run-mode CASE --tmp-dir \$PBS_JOBFS/tmp --contig-ploidy-calls \$PBS_JOBFS/$cohort-$individual\_ploidy-calls --model \$PBS_JOBFS/$model.$split-model --output $dir_run --output-prefix $cohort-$individual\_caller.$split -I $dir_readcount/$cohort-$individual.tsv";
 $cmd =~ s/\s+-/ \\\n  -/g;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 $r = $Syscall->run($cmd);
-
-#exit(PIPE_NO_PROGRESS);
 exit(1) if($r);
 
 exit(0);

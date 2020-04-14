@@ -2,6 +2,7 @@
 use strict;
 use Data::Dumper;
 use Getopt::Long;
+use File::Copy qw(cp mv);
 use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
@@ -28,6 +29,7 @@ GetOptions(\%OPT,
 	   		"individual=s",
 	   		"readfile=s",
 	   		"split=s",
+	   		"mode=s",
 	   		"exit=s"
 	   		);
 	   		
@@ -70,7 +72,7 @@ Marcin Adamski
 
 =cut
 
-
+my $mode       = $OPT{mode};
 my $step       = $OPT{step};
 my $split      = $OPT{'split'};
 my $cohort     = $OPT{cohort};
@@ -83,38 +85,64 @@ warn "running pipeline step '$step".(defined $split? $split: '')."' on cohort '$
 my $Config   = modules::Config->new($OPT{config});
 my $Syscall  = modules::SystemCall->new();
 
-my $pversion    = $Config->read("global", "version");
-my $codebase    = $Config->read("directories", "pipeline");
+my $pversion = $Config->read("global", "version");
+my $codebase = $Config->read("directories", "pipeline");
 warn "pipeline version: '$pversion', codebase: '$codebase'\n";
-my $dir_cohort  = $Config->read("cohort", "dir");
+
+my $dir_cohort = $Config->read("cohort", "dir");
 modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
+
 my $dir_run = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:$step", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_run") if(!-d $dir_run);
+my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
+modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
 #my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
 #modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
-my $dir_bam = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:bqsr_gather_bam", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_bam") if(!-d $dir_bam);
+my $dir_readcount = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_read_counts", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_readcount") if(!-d $dir_readcount);
+my $dir_ploidy = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_ploidy", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_ploidy") if(!-d $dir_ploidy);
+my $dir_calls = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:split:gatk_cnv_caller", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_calls") if(!-d $dir_calls);
 
-#my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
-#modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
-#modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
-#my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
-#$Cohort->add_individuals_ped();
+my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
+modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
+modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
+
+my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+$Cohort->add_individuals_ped();
 #my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
 
 my $reference = $Config->read("references", "genome_fasta");
-my $region    = $Config->read("targets", "cnv_target");
+my $model     = $Config->read("step:$step", "cnv_caller_model");
 my $cmd       = $Config->read("step:$step", "gatk_bin");
 
-#$cmd .= " CollectReadCounts --tmp-dir $dir_tmp -R $reference -L $dir_interval/targets_preprocessed.interval_list -imr OVERLAPPING_ONLY --format TSV -I $dir_bam/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.tsv";
-$cmd .= " CollectReadCounts --tmp-dir $dir_tmp -R $reference -L $region -imr OVERLAPPING_ONLY --format TSV -I $dir_bam/$cohort-$individual.bqsr.bam -O $dir_run/$cohort-$individual.tsv";
+my $dict = $reference;
+$dict =~ s/\.fa(sta)*$/\.dict/;
+
+my @calls;
+my @models;
+foreach(sort keys %{$Config->read("split")}){
+	my $c = "$dir_calls/$cohort-$individual\_caller.$_-calls";
+	#my $c  = "$model.$_-calls";
+	my $m  = "$model.$_-model";
+	modules::Exception->throw("Can't access dir '$m'") if(!-d $m);
+	modules::Exception->throw("Can't access dir '$c'") if(!-d $c);
+	push @calls, $c;
+	push @models, $m;
+}
+
+my $r;
+$cmd .= " PostprocessGermlineCNVCalls --tmp-dir $dir_tmp --allosomal-contig chrX --allosomal-contig chrY --sequence-dictionary $dict --contig-ploidy-calls $dir_ploidy/$cohort-$individual\_ploidy-calls --sample-index 0 --model-shard-path ".join(" --model-shard-path ", @models)." --calls-shard-path ".join(" --calls-shard-path ", @calls)." --output-denoised-copy-ratios $dir_run/$cohort-$individual\_denoised-copy-ratios.interval_list --output-genotyped-intervals $dir_run/$cohort-$individual\_intervals.vcf.gz --output-genotyped-segments $dir_run/$cohort-$individual\_segments.vcf.gz";
+$cmd =~ s/\s+-/ \\\n  -/g;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
-my $r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
+
 exit(0);
 
 END{

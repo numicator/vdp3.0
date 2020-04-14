@@ -117,18 +117,17 @@ my $reference = $Config->read("references", "genome_fasta");
 my $model     = $Config->read("step:$step", "contig_ploidy_model");
 my $cmd       = $Config->read("step:$step", "gatk_bin");
 
-my @files;
-foreach(sort @{$Cohort->individual}){
-	my $indv = $_->id;
-	my $f = "$dir_readcount/$cohort-$indv.tsv";
-	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
-	modules::Exception->throw("File '$f' is empty") if(!-s $f);
-	push @files, $f;
-}
+#my @files;
+#foreach(sort @{$Cohort->individual}){
+#	my $indv = $_->id;
+#	my $f = "$dir_readcount/$cohort-$indv.tsv";
+#	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
+#	modules::Exception->throw("File '$f' is empty") if(!-s $f);
+#	push @files, $f;
+#}
 
 my $r;
-#$cmd .= " DetermineGermlineContigPloidy --tmp-dir $dir_tmp -L $dir_interval/targets_preprocessed.interval_list -imr OVERLAPPING_ONLY --contig-ploidy-priors $prior --output $dir_run --output-prefix ploidy -I ".join(" -I ", @files);
-$cmd .= " DetermineGermlineContigPloidy --tmp-dir $dir_tmp --model $model --output $dir_run --output-prefix ploidy -I $dir_readcount/$cohort-$individual.tsv";
+$cmd .= " DetermineGermlineContigPloidy --tmp-dir $dir_tmp --model $model --output $dir_run --output-prefix $cohort-$individual\_ploidy -I $dir_readcount/$cohort-$individual.tsv";
 $cmd =~ s/\s+-/ \\\n  -/g;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 $r = $Syscall->run($cmd);

@@ -46,6 +46,11 @@ WGS=$[directories]genome/targets/wgs.bed
 hs_bait=$[directories]genome/targets/S30409818_Covered.interval_list
 hs_target=$[directories]genome/targets/S30409818_Regions_named.interval_list
 
+#GATK cnv targets - they are WES hs_target plus 250bp on each side; 
+# they are then split into 10 consequitive files for scattering with IntervalListTools; we can't use our 'normal' chromosomal splits, 
+#as the cnv splits MUST BE consequitive (intervals must be ordered within and between the files) or PostprocessGermlineCNVCalls fails
+cnv_target = $[directories]genome/GATK_cnv/cnv_WES.interval_list
+
 [tools]
 fastqc=$[directories]tools/FastQC/fastqc
 bwa=$[directories]tools/bwa-0.7.17/bwa
@@ -98,51 +103,61 @@ Cosmic=v90
 [split:1_21]
 bed=$[directories]genome/splits/1_21.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.01.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.01.interval_list
 intervals=chr1,chr21
 
 [split:2_18]
 bed=$[directories]genome/splits/2_18.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.02.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.02.interval_list
 intervals=chr2,chr18
 
 [split:3_14]
 bed=$[directories]genome/splits/3_14.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.03.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.03.interval_list
 intervals=chr3,chr14
 
 [split:4_15_M]
 bed=$[directories]genome/splits/4_15_M.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.04.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.04.interval_list
 intervals=chr4,chr15,chrM,
 
 [split:5_13_Y]
 bed=$[directories]genome/splits/5_13_Y.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.05.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.05.interval_list
 intervals=chr5,chr13,chrY
 
 [split:6_9]
 bed=$[directories]genome/splits/6_9.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.06.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.06.interval_list
 intervals=chr6,chr9
 
 [split:7_10]
 bed=$[directories]genome/splits/7_10.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.07.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.07.interval_list
 intervals=chr7,chr10
 
 [split:8_11]
 bed=$[directories]genome/splits/8_11.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.08.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.08.interval_list
 intervals=chr8,chr11
 
 [split:12_22_X_Un]
 bed=$[directories]genome/splits/12_22_X_Un.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.09.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.09.interval_list
 intervals=chr12,chr22,chrX,chr1_KI270706v1_random,chr1_KI270707v1_random,chr1_KI270708v1_random,chr1_KI270709v1_random,chr1_KI270710v1_random,chr1_KI270711v1_random,chr1_KI270712v1_random,chr1_KI270713v1_random,chr1_KI270714v1_random,chr2_KI270715v1_random,chr2_KI270716v1_random,chr3_GL000221v1_random,chr4_GL000008v2_random,chr5_GL000208v1_random,chr9_KI270717v1_random,chr9_KI270718v1_random,chr9_KI270719v1_random,chr9_KI270720v1_random,chr11_KI270721v1_random,chr14_GL000009v2_random,chr14_GL000225v1_random,chr14_KI270722v1_random,chr14_GL000194v1_random,chr14_KI270723v1_random,chr14_KI270724v1_random,chr14_KI270725v1_random,chr14_KI270726v1_random,chr15_KI270727v1_random,chr16_KI270728v1_random,chr17_GL000205v2_random,chr17_KI270729v1_random,chr17_KI270730v1_random,chr22_KI270731v1_random,chr22_KI270732v1_random,chr22_KI270733v1_random,chr22_KI270734v1_random,chr22_KI270735v1_random,chr22_KI270736v1_random,chr22_KI270737v1_random,chr22_KI270738v1_random,chr22_KI270739v1_random,chrY_KI270740v1_random,chrUn_KI270302v1,chrUn_KI270304v1,chrUn_KI270303v1,chrUn_KI270305v1,chrUn_KI270322v1,chrUn_KI270320v1,chrUn_KI270310v1,chrUn_KI270316v1,chrUn_KI270315v1,chrUn_KI270312v1,chrUn_KI270311v1,chrUn_KI270317v1,chrUn_KI270412v1,chrUn_KI270411v1,chrUn_KI270414v1,chrUn_KI270419v1,chrUn_KI270418v1,chrUn_KI270420v1,chrUn_KI270424v1,chrUn_KI270417v1,chrUn_KI270422v1,chrUn_KI270423v1,chrUn_KI270425v1,chrUn_KI270429v1,chrUn_KI270442v1,chrUn_KI270466v1,chrUn_KI270465v1,chrUn_KI270467v1,chrUn_KI270435v1,chrUn_KI270438v1,chrUn_KI270468v1,chrUn_KI270510v1,chrUn_KI270509v1,chrUn_KI270518v1,chrUn_KI270508v1,chrUn_KI270516v1,chrUn_KI270512v1,chrUn_KI270519v1,chrUn_KI270522v1,chrUn_KI270511v1,chrUn_KI270515v1,chrUn_KI270507v1,chrUn_KI270517v1,chrUn_KI270529v1,chrUn_KI270528v1,chrUn_KI270530v1,chrUn_KI270539v1,chrUn_KI270538v1,chrUn_KI270544v1,chrUn_KI270548v1,chrUn_KI270583v1,chrUn_KI270587v1,chrUn_KI270580v1,chrUn_KI270581v1,chrUn_KI270579v1,chrUn_KI270589v1,chrUn_KI270590v1,chrUn_KI270584v1,chrUn_KI270582v1,chrUn_KI270588v1,chrUn_KI270593v1,chrUn_KI270591v1,chrUn_KI270330v1,chrUn_KI270329v1,chrUn_KI270334v1,chrUn_KI270333v1,chrUn_KI270335v1,chrUn_KI270338v1,chrUn_KI270340v1,chrUn_KI270336v1,chrUn_KI270337v1,chrUn_KI270363v1,chrUn_KI270364v1,chrUn_KI270362v1,chrUn_KI270366v1,chrUn_KI270378v1,chrUn_KI270379v1,chrUn_KI270389v1,chrUn_KI270390v1,chrUn_KI270387v1,chrUn_KI270395v1,chrUn_KI270396v1,chrUn_KI270388v1,chrUn_KI270394v1,chrUn_KI270386v1,chrUn_KI270391v1,chrUn_KI270383v1,chrUn_KI270393v1,chrUn_KI270384v1,chrUn_KI270392v1,chrUn_KI270381v1,chrUn_KI270385v1,chrUn_KI270382v1,chrUn_KI270376v1,chrUn_KI270374v1,chrUn_KI270372v1,chrUn_KI270373v1,chrUn_KI270375v1,chrUn_KI270371v1,chrUn_KI270448v1,chrUn_KI270521v1,chrUn_GL000195v1,chrUn_GL000219v1,chrUn_GL000220v1,chrUn_GL000224v1,chrUn_KI270741v1,chrUn_GL000226v1,chrUn_GL000213v1,chrUn_KI270743v1,chrUn_KI270744v1,chrUn_KI270745v1,chrUn_KI270746v1,chrUn_KI270747v1,chrUn_KI270748v1,chrUn_KI270749v1,chrUn_KI270750v1,chrUn_KI270751v1,chrUn_KI270752v1,chrUn_KI270753v1,chrUn_KI270754v1,chrUn_KI270755v1,chrUn_KI270756v1,chrUn_KI270757v1,chrUn_GL000214v1,chrUn_KI270742v1,chrUn_GL000216v2,chrUn_GL000218v1
 
 [split:16_17_19_20]
 bed=$[directories]genome/splits/16_17_19_20.bed
 gvcfdb=$[directories]genome/gvcfs/CCG_WES.10.gdb
+cnv=$[directories]genome/GATK_cnv/cnv_WES.10.interval_list
 intervals=chr16,chr17,chr19,chr20
 
 [steps]
@@ -170,10 +185,12 @@ intervals=chr16,chr17,chr19,chr20
 23:cohort=split:merge_callers
 24:cohort=split:vep
 25:cohort=report_snv
-26:cohort=gatk_cnv_intervals
+#26:cohort=gatk_cnv_intervals
 27:individual=gatk_cnv_read_counts
-28:cohort=gatk_cnv_ploidy
-29:cohort=gatk_cnv_caller
+28:individual=gatk_cnv_ploidy
+29:individual=split:gatk_cnv_caller
+30:individual=gatk_cnv_gather_calls
+31:cohort=report_cnv
 99:cohort=summary_report
 
 [step:fastqc]
@@ -555,24 +572,52 @@ gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -X
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
-pbs_ncpus=1
-pbs_walltime=01:00:00
+pbs_ncpus=2
+pbs_walltime=12:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkcnvploidy.pl
 #this step requires GATK python conda enviro. see below how it is switched on
-gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; $[tools]gatk 
+gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; export MKL_DYNAMIC=false; export OMP_NESTED=true; export MKL_NUM_THREADS=2; export OMP_NUM_THREADS=2; $[tools]gatk 
 contig_ploidy_model=$[directories]genome/GATK_cnv/ploidy_WES-model
 
-[step:gatk_cnv_caller]
+[step:split:gatk_cnv_caller]
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
-pbs_mem=8GB
-pbs_ncpus=1
-pbs_walltime=01:00:00
+pbs_mem=48GB
+pbs_ncpus=8
+pbs_walltime=24:00:00
 pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkcnvcaller.pl
 #this step requires GATK python conda enviro. see below how it is switched on
-gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; $[tools]gatk 
-cnv_caller_model=$[directories]genome/GATK_cnv/caller_WES-model
+gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; export MKL_DYNAMIC=false; export OMP_NESTED=true; export MKL_NUM_THREADS=8; export OMP_NUM_THREADS=8; $[tools]gatk 
+#do not put the '-model' suffix below, the expected actuall names include split, eg. caller_WES.01-model, caller_WES.02-model...
+cnv_caller_model=$[directories]genome/GATK_cnv/caller_WES
+
+[step:gatk_cnv_gather_calls]
+dir=gatk_cnv
+pbs_queue=$[global]pbs_queue
+pbs_mem=32GB
+pbs_ncpus=8
+pbs_walltime=24:00:00
+pbs_jobfs=100GB
+modules=java/jdk-13.33,python3-as-python
+cmd_1=$[directories]pipeline/scripts/step_gatkcnvgather.pl
+#this step requires GATK python conda enviro. see below how it is switched on
+gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; export MKL_DYNAMIC=false; export OMP_NESTED=true; export MKL_NUM_THREADS=8; export OMP_NUM_THREADS=8; $[tools]gatk 
+cnv_caller_model=$[directories]genome/GATK_cnv/caller_WES
+
+[step:report_cnv]
+dir=gatk_cnv
+pbs_queue=$[global]pbs_queue
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=1:00:00
+pbs_jobfs=100GB
+modules=java/jdk-13.33,python3-as-python
+cmd_1=$[directories]pipeline/scripts/step_reportcnv.pl
+bgzip_bin=$[tools]bgzip
+tabix_bin=$[tools]tabix
+vep_bin=$[tools]vep
+fasta=$[directories]vep_db/Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz

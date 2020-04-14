@@ -1,0 +1,128 @@
+ccg_cohort0002
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0002'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48269s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0002' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0003
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0003'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48267s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0003' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0004
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0004'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0004' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0005
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0005'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48231s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0005' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0006
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0006'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48231s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0006' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0007
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0007'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48229s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0007' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0008
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0008'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48221s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0008' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0009
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0009'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0009' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0010
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0010'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0010' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0011
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0011'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48143s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0011' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0012
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0012'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0012' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0013
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0013'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0013' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0014
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0014'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48073s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0014' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0015
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0015'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48060s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0015' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0016
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0016'
+waiting to lock lockfile pipe_progress.lock... locked
+cohort 'ccg_cohort0016' has already completed the pipeline
+done script pipe_progress.pl
+ccg_cohort0017
+pipeline version: 'vdp3.0', codebase: '/g/data/xx92/vdp3.0'
+quering PBS jobs status...
+number of jobs in the queues: 1
+progressing cohort 'ccg_cohort0017'
+waiting to lock lockfile pipe_progress.lock... lock file age: 48023s (max allowed age is 600s), lock file considered stale, overriding and retrying, locked
+cohort 'ccg_cohort0017' has already completed the pipeline
+done script pipe_progress.pl

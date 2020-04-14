@@ -68,8 +68,6 @@ Marcin Adamski
 ./pipe_add_cohort.pl
 
 =cut
-END{warn "done script ".basename(__FILE__)."\n"}
-
 my $confdir = modules::Utils::confdir;
 modules::Exception->throw("Can't access configuration file '$confdir/pipeline.cnf'") if(!-f "$confdir/pipeline.cnf");
 my $Config   = modules::Config->new("$confdir/pipeline.cnf");
@@ -190,6 +188,11 @@ if(defined $OPT{cohort}){
 	#$Pipeline->pipe_start() if(defined $OPT{submit});
 }
 
-$Pipeline->database_unlock;
+#$Pipeline->database_unlock;
+
+END{
+	$Pipeline->database_unlock;
+	warn "done script ".basename(__FILE__)."\n"
+}
 
 exit 0;
