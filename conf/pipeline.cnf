@@ -1,5 +1,6 @@
 [global]
 version=vdp3.0
+env_file=environment.txt
 
 pbs_shebang=#!/bin/bash
 #pbs_project=xx92
@@ -12,7 +13,6 @@ pbs_group_list=xx92
 
 read_regex1=.*_R?1_.*\.f(ast)?q\.gz
 read_regex2=_R?1_
-env_file=environment.txt
 
 [directories]
 pipeline=/g/data/xx92/$version
@@ -47,7 +47,7 @@ hs_bait=$[directories]genome/targets/S30409818_Covered.interval_list
 hs_target=$[directories]genome/targets/S30409818_Regions_named.interval_list
 
 #GATK cnv targets - they are WES hs_target plus 250bp on each side; 
-# they are then split into 10 consequitive files for scattering with IntervalListTools; we can't use our 'normal' chromosomal splits, 
+#they are then split into 10 consequitive files for scattering with IntervalListTools; we can't use our 'normal' chromosomal splits, 
 #as the cnv splits MUST BE consequitive (intervals must be ordered within and between the files) or PostprocessGermlineCNVCalls fails
 cnv_target = $[directories]genome/GATK_cnv/cnv_WES.interval_list
 

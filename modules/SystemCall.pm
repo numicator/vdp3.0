@@ -14,7 +14,8 @@ sub run{
 
 	my $ret;
 	$command = "set -o pipefail; $command";
-	warn "modules::SystemCall::run: $command\n";
+	warn "modules::SystemCall::run: start: ".modules::Utils->get_time_stamp."\n";
+	warn "modules::SystemCall::run: system: $command\n";
 	if($ret = system($command))
 	{
 		if(defined $bail && $bail){
@@ -22,9 +23,11 @@ sub run{
 		}
 		else{
 			#warn "command exited with non-zero status $ret (dying)\n";
+			warn "modules::SystemCall::run: done: ".modules::Utils->get_time_stamp."\n";
 			modules::Exception->throw("command exited with non-zero status $ret (dying)")
 		}
 	} 
+	warn "modules::SystemCall::run: done: ".modules::Utils->get_time_stamp."\n";
 	return $ret;
 }#run
 

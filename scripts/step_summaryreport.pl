@@ -108,6 +108,13 @@ modules::Exception->throw("Can't access cohort run TEMP directory $dir_bam") if(
 my $dir_vcf = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:report_snv", "dir");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_vcf") if(!-d $dir_vcf);
 
+my $dir_ploidy = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_ploidy", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_ploidy") if(!-d $dir_ploidy);
+
+my $dir_cnv = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:report_cnv", "dir");
+modules::Exception->throw("Can't access cohort run directory $dir_cnv") if(!-d $dir_cnv);
+
+
 my $PED = modules::PED->new("$dir_cohort/$cohort.pedx");
 modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
@@ -373,7 +380,7 @@ foreach my $indv(@indv_id){
 	($final_page, $number_of_pages, $final_y) = table(\@fq, $final_y - 8, 8, 2);
 }#foreach my $indv(@indv_id)
 
-# ********* Variant Summary Page **************
+# ********* Short Variant Summary Page **************
 $pdf->add_page();
 $pdf->set_font('Arial');
 
@@ -393,7 +400,7 @@ while(<F>){
 		next;
 	}
 	else{
-		push @vcf_data, ["Total Varians", "Passed Filer: ".ithf($a[$head{snp}] + $a[$head{indel}]),"   Did Not Pass Filter: ".ithf($a[$head{bad_cover}])];
+		push @vcf_data, ["SNP and INDEL Varians", "Passed Filer: ".ithf($a[$head{snp}] + $a[$head{indel}]),"   Did Not Pass Filter: ".ithf($a[$head{bad_cover}])];
 		push @vcf_data, ["SNPs which Passed The Filter:"];
 		push @vcf_data, ["   All SNPs", ithf(sprintf("%-9d", $a[$head{snp}])),"   Ti/Tv ratio: ".sprintf("%.2f", $a[$head{ti}] / ($a[$head{snp}] - $a[$head{ti}]))];
 		push @vcf_data, ["   Known SNPs", ithf(sprintf("%-9d", $a[$head{snp_known}])),"   Ti/Tv ratio: ".sprintf("%.2f", $a[$head{ti_known}] / ($a[$head{snp_known}] - $a[$head{ti_known}]))];
@@ -408,9 +415,48 @@ close F;
 
 
 ($final_page, $number_of_pages, $final_y) = table(\@vcf_data, $pdf->margin_bottom + 710);
-warn "image '$dir_vqsr/$cohort.SNP.tranches.png' NOT OK\n" if(! -s "$dir_vqsr/$cohort.SNP.tranches.png");
-$pdf->image("$dir_vqsr/$cohort.SNP.tranches.png", x => ($pdf->width / 2) - 225 , y => $final_y - 300 - 8, width => 450, height => 300);
+warn "VQASR tranches image file '$dir_vqsr/$cohort.SNP.all.tranches.png' is empty\n" if(! -s "$dir_vqsr/$cohort.SNP.all.tranches.png");
+$pdf->image("$dir_vqsr/$cohort.SNP.all.tranches.png", x => ($pdf->width / 2) - 225 , y => $final_y - 300 - 8, width => 450, height => 300);
 $pdf->rect(x => $pdf->margin_left, y => $final_y - 8, to_x => $pdf->margin_left + $pdf->effective_width, to_y => $final_y - 8 - 300, width => 1, stroke => 'on', stroke_color => 'grey', fill => 'off');
+
+# ********* Copy Number Variant Summary Page **************
+$pdf->add_page();
+$pdf->set_font('Arial');
+
+my $n_cnv_all    = `zcat $dir_cnv/$cohort.cnv.vep_all.tsv.gz| wc -l`;
+my $n_cnv_coding = `zcat $dir_cnv/$cohort.cnv.vep_coding.tsv.gz| wc -l`;
+$n_cnv_all--;
+$n_cnv_coding--;
+
+my @cnv_data;
+push @cnv_data, ["COPY NUMBER VARIANT DISCOVERY STATS", ''];
+push @cnv_data, ["All Variants", ithf(sprintf("%-9d", $n_cnv_all))];
+push @cnv_data, ["Coding Variants (exons and splice-regions)", ithf(sprintf("%-9d", $n_cnv_coding))];
+($final_page, $number_of_pages, $final_y) = table(\@cnv_data, $pdf->margin_bottom + 710);
+
+my @ploidy_data;
+my @ploidy;
+push @ploidy_data, ["Chromosomal Ploidy"];
+($final_page, $number_of_pages, $final_y) = table(\@ploidy_data, $final_y - 8);
+foreach my $indv(@indv_id){
+	open F, "$dir_ploidy/$cohort-$indv\_ploidy-calls/SAMPLE_0/contig_ploidy.tsv" or modules::Exception->throw("Can't open '$dir_ploidy/$cohort-$indv\_ploidy-calls/SAMPLE_0/contig_ploidy.tsv'");
+	<F>;<F>;
+	my $cnt = 0;
+	push @ploidy_data, ["$indv", '', '', '', '', '', '', '', ''];
+	while(<F>){
+		chomp;
+		$cnt++;
+		my @a = split "\t";
+		push @ploidy, sprintf("%-6s: %2s", $a[0], $a[1]);
+		if(!($cnt % 8)){
+			push @ploidy_data, ['', @ploidy];
+			undef @ploidy;
+		}
+	}
+	close F;
+	($final_page, $number_of_pages, $final_y) = table(\@ploidy_data, $final_y - 2);
+	undef @ploidy_data;
+}#foreach
 
 # ********* Tools Summary Page **************
 $pdf->add_page();
@@ -437,16 +483,21 @@ foreach my $db(sort keys %{$Db}){
 	push @db_data, [$db, $ver]
 }
 
+($final_page, $number_of_pages, $final_y) = table(\@tools_data, $pdf->margin_bottom + 710);
+($final_page, $number_of_pages, $final_y) = table(\@db_data, $final_y - 8);
+
+# ********* Pipeline Steps Summary Page **************
+$pdf->add_page();
+$pdf->set_font('Arial');
+
 my @step_data;
 push @step_data, ['PIPELINE STEPS', ''];
 foreach(@{$Pipeline->pipesteps}){
-	warn "step: $_->[0] $_->[1]\n";
+	#warn "step: $_->[0] $_->[1]\n";
 	push @step_data, [$_->[0], $_->[1]];
 }
 
-($final_page, $number_of_pages, $final_y) = table(\@tools_data, $pdf->margin_bottom + 710);
-($final_page, $number_of_pages, $final_y) = table(\@db_data, $final_y - 8);
-($final_page, $number_of_pages, $final_y) = table(\@step_data, $final_y - 8, 8, 2);
+($final_page, $number_of_pages, $final_y) = table(\@step_data, $pdf->margin_bottom + 710);
 
 $pdf->save();
 

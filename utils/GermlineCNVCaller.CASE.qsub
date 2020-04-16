@@ -1,0 +1,179 @@
+#!/bin/bash
+#PBS -P u86
+#PBS -q normal
+#PBS -l walltime=48:00:00,mem=128GB,ncpus=8,jobfs=100GB
+#PBS -l storage=gdata/u86+gdata/xx92
+#PBS -l other=gdata
+#PBS -W umask=0007
+#PBS -o /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller.CASE.out
+#PBS -e /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/GermlineCNVCaller.CASE.err
+
+module load java/jdk-13.33 python3-as-python
+cd /g/data/xx92/data/vdp3.0/
+source /g/data/xx92/vdp3.0/conf/environment.txt
+unset PYTHONPATH
+source /g/data/xx92/vdp3.0/software/miniconda3/etc/profile.d/conda.sh
+conda activate gatk
+
+#/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk FilterIntervals \
+#  --tmp-dir /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/tmp \
+#  -imr OVERLAPPING_ONLY \
+#  -L /g/data/xx92/vdp3.0/GRCh38/splits/1_21.interval_list \
+#  -L /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/targets_preprocessed.interval_list \
+#  -O /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/1_21_filtered.interval_list \
+#  -I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv \
+
+cd \$PBS_JOBFS
+cp -a /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553_ploidy-calls .
+cp -a /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_WES.02-model .
+
+mkdir -p tmp
+
+#export MKL_DYNAMIC=false
+#export OMP_NESTED=true
+export MKL_NUM_THREADS=8
+export OMP_NUM_THREADS=8
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller \
+  --run-mode CASE \
+  --tmp-dir tmp \
+  --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls \
+  --model caller_WES.02-model \
+  --output . \
+  --output-prefix cnv_cohort0001-CCG0553.02 \
+  -I /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv
+
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk PostprocessGermlineCNVCalls \
+  --tmp-dir /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/tmp \
+  --model /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_WES.01-model \
+  --calls-shard-path /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/cnv_test_cohort0001-CCG0553-calls
+  --allosomal-contig chrX --allosomal-contig chrY
+  --contig-ploidy-calls ploidy-case-calls
+  
+  
+        --model-shard-path cohort23-twelve/cohort23-twelve_1of2-model \
+        --model-shard-path cohort23-twelve/cohort23-twelve_2of2-model \
+        --calls-shard-path case-twelve-vs-cohort23/case-twelve-vs-cohort23_1of2-calls \
+        --calls-shard-path case-twelve-vs-cohort23/case-twelve-vs-cohort23_2of2-calls \
+        --allosomal-contig chrX --allosomal-contig chrY \
+        --contig-ploidy-calls ploidy-case-calls \
+        --sample-index 0 \
+        --output-genotyped-intervals genotyped-intervals-case-twelve-vs-cohort23.vcf.gz \
+        --output-genotyped-segments genotyped-segments-case-twelve-vs-cohort23.vcf.gz \
+        --sequence-dictionary ref/Homo_sapiens_assembly38.dict
+        
+        
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk IntervalListTools --INPUT targets_preprocessed.interval_list --SUBDIVISION_MODE INTERVAL_COUNT --SCATTER_COUNT 10 --OUTPUT scatter
+        
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk PostprocessGermlineCNVCalls \
+  --tmp-dir /g/data/xx92/data/vdp3.0/ccg_cohort0004/run/tmp \
+  --allosomal-contig chrX \
+  --allosomal-contig chrY \
+  --sequence-dictionary /g/data/xx92/vdp3.0/GRCh38/GATK_bundle_v0/Homo_sapiens_assembly38.dict \
+  --contig-ploidy-calls /g/data/xx92/data/vdp3.0/ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633_ploidy-calls \
+  --output-denoised-copy-ratios /g/data/xx92/data/vdp3.0/ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633_denoised-copy-ratios \
+  --output-genotyped-intervals /g/data/xx92/data/vdp3.0/ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633_genotyped-intervals \
+  --output-genotyped-segments /g/data/xx92/data/vdp3.0/ccg_cohort0004/run/gatk_cnv/ccg_cohort0004-CCG0633_genotyped-segments \
+  --sample-index 0 \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.01-model \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.01-calls 
+  
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.02-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.03-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.04-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.05-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.06-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.07-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.08-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.09-model \
+  --model-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.10-model \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.01-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.02-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.03-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.04-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.05-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.06-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.07-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.08-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.09-calls \
+  --calls-shard-path /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_large_WES.10-calls \
+          
+export MKL_DYNAMIC=false; export OMP_NESTED=true; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk PostprocessGermlineCNVCalls --tmp-dir tmp --allosomal-contig chrX --allosomal-contig chrY --sequence-dictionary /g/data/xx92/vdp3.0/GRCh38/GATK_bundle_v0/Homo_sapiens_assembly38.dict --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls --output-denoised-copy-ratios ccg_cohort0004-CCG0633_denoised-copy-ratios --output-genotyped-intervals ccg_cohort0004-CCG0633_genotyped-intervals.vcf.gz --output-genotyped-segments ccg_cohort0004-CCG0633_genotyped-segments.vcf.gz --sample-index 0 --model-shard-path caller_WES.02-model --model-shard-path caller_WES.03-model --model-shard-path caller_WES.04-model --calls-shard-path cnv_cohort0001-CCG0553.02-calls --calls-shard-path cnv_cohort0001-CCG0553.03-calls --calls-shard-path cnv_cohort0001-CCG0553.04-calls
+
+
+
+
+
+
+
+
+ 1992  cp -a /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553_ploidy-calls .
+ 1993  cp -a /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_WES.02-model .
+ 1994  ll
+ 1995  mkdir $PBS_JOBFS/tmp
+ 1996  ll
+ 1997  export MKL_NUM_THREADS=8
+ 1998  export OMP_NUM_THREADS=8
+ 1999  /g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller   --run-mode CASE   --tmp-dir tmp   --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls   --model caller_WES.02-model   --output .   --output-prefix cnv_cohort0001-CCG0553.02   -I /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv
+ 2000  ll
+ 2001  cp -a /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_WES.03-model .
+ 2002  cp -a /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/caller_WES.04-model .
+ 2003  /g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller   --run-mode CASE   --tmp-dir tmp   --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls   --model caller_WES.03-model   --output .   --output-prefix cnv_cohort0001-CCG0553.03   -I /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv
+ 2004  ll
+ 2005  /g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller   --run-mode CASE   --tmp-dir tmp   --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls   --model caller_WES.04-model   --output .   --output-prefix cnv_cohort0001-CCG0553.04   -I /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv
+ 2006  ll
+ 2007  ll caller_WES.02-model
+ 2008  ll caller_WES.03-model
+ 2009  ll caller_WES.04-model
+ 2010  ll cnv_cohort0001-CCG0553.02-calls
+ 2011  ll cnv_cohort0001-CCG0553.03-calls
+ 2012  ll cnv_cohort0001-CCG0553.04-calls
+ 
+ 2013  /g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk PostprocessGermlineCNVCalls --tmp-dir tmp --allosomal-contig chrX --allosomal-contig chrY --sequence-dictionary /g/data/xx92/vdp3.0/GRCh38/GATK_bundle_v0/Homo_sapiens_assembly38.dict --contig-ploidy-calls ccg_cohort0001-CCG0553_ploidy-calls --output-denoised-copy-ratios ccg_cohort0004-CCG0633_denoised-copy-ratios --output-genotyped-intervals ccg_cohort0004-CCG0633_genotyped-intervals.vcf.gz --output-genotyped-segments ccg_cohort0004-CCG0633_genotyped-segments.vcf.gz --sample-index 0 --model-shard-path caller_WES.02-model --model-shard-path caller_WES.03-model --model-shard-path caller_WES.04-model --calls-shard-path cnv_cohort0001-CCG0553.02-calls --calls-shard-path cnv_cohort0001-CCG0553.03-calls --calls-shard-path cnv_cohort0001-CCG0553.04-calls
+
+
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk FilterIntervals \
+-imr OVERLAPPING_ONLY  \
+-L /g/data/xx92/vdp3.0/GRCh38/splits/_21.interval_list \
+-L /g/data/xx92/data/vdp3.0/ccg_cohort0001/run/gatk_cnv/targets_preprocessed.interval_list \
+-O /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/21_filtered.interval_list \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0554.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0555.tsv
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk GermlineCNVCaller \
+--run-mode COHORT \
+-imr OVERLAPPING_ONLY  \
+-L /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/21_filtered.interval_list \
+--tmp-dir /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller/tmp \
+--contig-ploidy-calls /g/data/xx92/vdp3.0/GRCh38/GATK_cnv/ploidy_WES-calls \
+--output /g/data/xx92/data/vdp3.0/TMP_GermlineCNVCaller \
+--output-prefix caller_WES \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0553.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0554.tsv \
+-I ccg_cohort0001/run/gatk_cnv/ccg_cohort0001-CCG0555.tsv
+
+
+
+/g/data/xx92/vdp3.0/software/gatk-4.1.5.0/gatk IntervalListTools --INPUT targets_preprocessed.interval_list --SUBDIVISION_MODE INTERVAL_COUNT --SCATTER_COUNT 10 --OUTPUT scatter

@@ -104,6 +104,7 @@ modules::Exception->throw("cohort id submited as argument is not the same as coh
 #my $Pipeline = modules::Pipeline->new(cohort => $Cohort);
 #$Pipeline->get_pipesteps;
 #$Pipeline->get_qjobs;
+#my $reference   = $Config->read("references", "genome_fasta");
 
 my $vep_bin = $Config->read("step:$step", "vep_bin");
 my $bgzip_bin = $Config->read("step:$step", "bgzip_bin");
@@ -111,14 +112,19 @@ my $bcftools_bin = $Config->read("step:$step", "bcftools_bin");
 my $tabix_bin = $Config->read("step:$step", "tabix_bin");
 my $cmdx;
 
-#warn " *************** UNCOMMENT BCFTOOLS, VEP and TABIX *********************\n";
+#warn " *************** REMINDER: UNCOMMENT BCFTOOLS, VEP and TABIX *********************\n";
 
+#we need to split multi allelic loci and remove possibly duplicates
+#command below will work only if vcf is v4.2 - AD field must be defined as Number=R, not Number=. or Number=1
+#GATK generates it OK, Strelka and Varscan not. But if the vcf merge between callers in the previous step was done with GATK HC being the _first_ in the list, 
+#the 'Number=R' def for AD is put in the merged VCF header and all is OK
+#otherwise it would be necessary to manualy fix the AD field def. in the VCF header of Strelka and Varscan
+
+#the awk at the end of the pipe removes invariant sites (result of multi-sample joint calling); this was the cleanest way I was able to come with for this idiotic problem
+#GATK select variants can't deal with it, bcftools neither, vcftools can, but we don't use them for anything else, so simple awk must do
+#my $cmd = "$bcftools_bin norm -m -both $dir_run/$cohort.$split.vcf.gz | $bcftools_bin norm -d none -O v -o $dir_run/$cohort.$split.vep_in.vcf";
+my $cmd = "$bcftools_bin norm -m -both $dir_run/$cohort.$split.vcf.gz | $bcftools_bin norm -d none -O v | awk 'BEGIN{FS=\"\\t\";OFS=FS} {if(\$0~/^#/){print} else{ok=0; for(i=10;i<=NF;i++){split(\$(i),x,\":\"); if(!(x[1]~\"0.0\" || x[1]~\"\\\\..\\\\.\")) ok++} if(ok>0) print}}' >$dir_run/$cohort.$split.vep_in.vcf";
 my $r;
-#we need to split multi allelic loci loci and remove possibly duplicates
-#command below will work only if vcf header is 4.2 - AD field must be defined as Number=R, not Number=. or Number=1
-#GATK generates it OK, Strelka and Varscan not. But if the vcf merge between callers in the previous step was done with GATK being the first, the Number=R
-#otherwise it would be necessary to manualy fix the AD field def. in the VCF header 
-my $cmd = "$bcftools_bin norm -m -both $dir_run/$cohort.$split.vcf.gz | $bcftools_bin norm -d none -O v -o $dir_run/$cohort.$split.vep_in.vcf";
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 $r = $Syscall->run($cmd);
 exit(1) if($r);
@@ -147,6 +153,7 @@ $cmd = "$tabix_bin -f $dir_run/$cohort.$split.vep.vcf.gz";
 $r = $Syscall->run($cmd);
 exit(1) if($r);
 
+#make report tsv from VEP VCF
 open I, "$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|" or modules::Exception->throw("Can't do: '$bgzip_bin -dc $dir_run/$cohort.$split.vep.vcf.gz|'");
 open O, ">$dir_run/$cohort.$split.vep.tsv" or modules::Exception->throw("Can't open '$dir_run/$cohort.$split.vep.tsv' for writing");
 my %vepfld;
@@ -247,7 +254,7 @@ while(<I>){
 				$ad1 += $a1;
 				$rd  += $a0 + $a1;
 			}
-			if($rd > 0){ #in some multiallelic cases gatk-hc abd strelka report variants with 0 read support for an allele, I am not sure why, but here we get rid of them
+			if($rd > 0){ #in some multiallelic cases gatk-hc and strelka report variants with 0 read support for an allele, I am not sure why, but here we get rid of them
 				print O join("\t", $fld[0], $fld[1], $fld[3], $fld[4])."\t$rd\t$ad0\t$ad1\t".join("\t", @gt)."\t".join("\t", @gq)."\t".join("\t", @rds)."\t".join("\t", @ad0)."\t".join("\t", @ad1)."\t$caller\t$vqslod\t$mq";
 				print O "\t$csqs[$i]\n";
 			}

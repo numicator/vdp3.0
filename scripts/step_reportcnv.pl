@@ -127,6 +127,7 @@ foreach(sort @{$Cohort->individual}){
 my $header;
 my %vcf;
 my @sample;
+warn "processing sample vcf files:\n";
 for(my $i = 0; $i < scalar @files; $i++){
 	my $fname = $files[$i];
 	open I, "$bgzip_bin -dc $fname|" or modules::Exception->throw("Can't do: '$bgzip_bin -dc $fname|'");
@@ -146,7 +147,7 @@ for(my $i = 0; $i < scalar @files; $i++){
 		}
 		if(/^#CHROM/){
 			$smpl = $a[9];
-			warn "  $smpl\n";
+			warn " $smpl: $fname\n";
 			push @sample, $smpl;
 			next;
 		}
@@ -159,6 +160,8 @@ for(my $i = 0; $i < scalar @files; $i++){
 	#warn "done $fname\n";
 	close I;
 }
+warn "done sample vcf files\n";
+
 @sample = sort @sample;
 $header .= "\t".join("\t", @sample)."\n";
 
@@ -183,22 +186,31 @@ close O;
 my $cmd;
 my $r;
 $cmd = "$tabix_bin -f $dir_run/$cohort.cnv.vcf.gz";
-#$r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
 
-warn "running VEP on $dir_run/$cohort.cnv.vcf.gz\n";
+warn "running VEP on $dir_run/$cohort.cnv.vcf.gz:\n";
 $cmd = "--force_overwrite --cache --offline --species homo_sapiens --merged --fork 1 --biotype --regulatory --hgvs --numbers --symbol --canonical --flag_pick --vcf --use_transcript_ref --dir $index_dir --fasta $fasta --I $dir_run/$cohort.cnv.vcf.gz --stats_text --stats_file $dir_run/$cohort.cnv.vep_stats.txt -o stdout | $bgzip_bin -c >$dir_run/$cohort.cnv.vep.vcf.gz";
 $cmd =~ s/\s+-/ \\\n  -/g;
 $cmd = "$vep_bin $cmd";
-#$r = $Syscall->run($cmd);
+$r = $Syscall->run($cmd);
 exit(1) if($r);
+
+$cmd = "$tabix_bin -f $dir_run/$cohort.cnv.vep.vcf.gz";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
 warn "done VEP on $dir_run/$cohort.cnv.vcf.gz\n";
 
 open I, "$bgzip_bin -dc $dir_run/$cohort.cnv.vep.vcf.gz|" or modules::Exception->throw("Can't do: '$bgzip_bin -dc $dir_run/$cohort.cnv.vep.vcf.gz|'");
-open O, ">$dir_run/$cohort.cnv.vep.tsv" or modules::Exception->throw("Can't open '$dir_run/$cohort.cnv.vep.tsv' for writing");
+open O, "| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_all.tsv.gz" or modules::Exception->throw("Can't open '| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_all.tsv.gz' for writing");
+open C, "| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_coding.tsv.gz" or modules::Exception->throw("Can't open '| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_coding.tsv.gz' for writing");
+
 my %vepfld;
 my %sampcln;
 my $header_vep;
+
+my($cnt_coding, $cnt_all) = (0, 0);
 
 while(<I>){
 	chomp;
@@ -222,20 +234,26 @@ while(<I>){
 			$sampcln{$a[$i]} = $i;
 			#warn "  $a[$i] = $i\n";
 		}
-		print O "chr\tpos\tref\tevent";
+		print O "chr\tpos\tend\tevent";
+		print C "chr\tpos\tend\tevent";
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-GT";
+			print C "\t$_-GT";
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CN";
+			print C "\t$_-CN";
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CNQ";
+			print C "\t$_-CNQ";
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CNLP";
+			print C "\t$_-CNLP";
 		}
 		print O $header_vep;
+		print C $header_vep;
 	}
 	next if(/^#/);
 
@@ -246,19 +264,29 @@ while(<I>){
 	for(my $i = 0; $i < scalar @frmtags; $i++){
 		$frmtag{$frmtags[$i]} = $i;
 	}
+
+	my $evt = $fld[4];
+	$evt =~ s/[<>]//g;
+	my @event = split ",", $evt;
 	my @gt;
 	my @cn;
 	my @cnq;
 	my @cnlp;
 	foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 		my @a = split(':', $fld[$sampcln{$_}]);
-		push @gt,   $a[$frmtag{GT}];
+		#we are reporting the actual event's name instead of it's index:
+		$evt = '';
+		$evt = $event[$a[$frmtag{GT}] - 1] if($a[$frmtag{GT}] > 0);
+		#push @gt,   $a[$frmtag{GT}];   #we are reporting the actual event's name instead of it's index:
+		push @gt,   $evt;
 		push @cn,   $a[$frmtag{CN}];
 		push @cnq,  $a[$frmtag{CNQ}];
 		push @cnlp, $a[$frmtag{CNLP}];
 	}
 
 	my $csq = '';
+	my $end = '';
+	$end = $1 if($fld[7] =~ /END=([^\;]+)/);
 	$csq = $1 if($fld[7] =~ /CSQ=([^\;]+)/);
 	$csq =~ s/\|/\t/g;
 	my @csqs = split ",", $csq;
@@ -266,24 +294,44 @@ while(<I>){
 		$csqs[$i] =~ s/\&/,/g;
 		my @a = split "\t", $csqs[$i];
 		if(defined $a[$vepfld{PICK}] && $a[$vepfld{PICK}] ne '' && $a[$vepfld{PICK}] == 1){
-			print O join("\t", $fld[0], $fld[1], $fld[3], $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
+			$cnt_all++;
+			print O join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
 			print O "\t$csqs[$i]\n";
+			if((defined $a[$vepfld{Protein_position}] && $a[$vepfld{Protein_position}] ne '') || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
+				#warn "$a[$vepfld{Protein_position}]\t$a[$vepfld{Consequence}]\n";
+				$cnt_coding++;
+				print C join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
+				print C "\t$csqs[$i]\n";
+			}
 		}
 	}
 }
 close O;
+close C;
 close I;
+warn "printed $cnt_all all loci of which $cnt_coding were coding\n";
+
+#idexes of the report tsv files:
+$cmd = "$tabix_bin -f -p bed -S 1 -s 1 -b 2 -e 2 $dir_run/$cohort.cnv.vep_all.tsv.gz";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+$cmd = "$tabix_bin -f -p bed -S 1 -s 1 -b 2 -e 2 $dir_run/$cohort.cnv.vep_coding.tsv.gz";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
 
 #link in results:
 #VCF no VEP annotation
-#modules::Utils::lns("$dir_run/$cohort.vcf.gz", "$dir_result/$cohort.vcf.gz");
-#modules::Utils::lns("$dir_run/$cohort.vcf.gz.tbi", "$dir_result/$cohort.vcf.gz.tbi");
+modules::Utils::lns("$dir_run/$cohort.cnv.vcf.gz", "$dir_result/$cohort.cnv.vcf.gz");
+modules::Utils::lns("$dir_run/$cohort.cnv.vcf.gz.tbi", "$dir_result/$cohort.cnv.vcf.gz.tbi");
+#VCF with VEP annotation
+modules::Utils::lns("$dir_run/$cohort.cnv.vcf.gz", "$dir_result/$cohort.cnv.vep.vcf.gz");
+modules::Utils::lns("$dir_run/$cohort.cnv.vcf.gz.tbi", "$dir_result/$cohort.cnv.vep.vcf.gz.tbi");
 #TSV report complete, all variants
-#modules::Utils::lns("$dir_run/$cohort.vep_all.tsv.gz", "$dir_result/$cohort.vep_all.tsv.gz");
-#modules::Utils::lns("$dir_run/$cohort.vep_all.tsv.gz.tbi", "$dir_result/$cohort.vep_all.tsv.gz.tbi");
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_all.tsv.gz", "$dir_result/$cohort.cnv.vep_all.tsv.gz");
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_all.tsv.gz.tbi", "$dir_result/$cohort.cnv.vep_all.tsv.gz.tbi");
 #TSV report coding, only variants affecting coding sequence - exonic and splice-regions
-#modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz", "$dir_result/$cohort.vep_coding.tsv.gz");
-#modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz.tbi", "$dir_result/$cohort.vep_coding.tsv.gz.tbi");
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_coding.tsv.gz", "$dir_result/$cohort.cnv.vep_coding.tsv.gz");
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_coding.tsv.gz.tbi", "$dir_result/$cohort.cnv.vep_coding.tsv.gz.tbi");
 
 exit(0);
 

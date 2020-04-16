@@ -169,7 +169,7 @@ sub recal{
 	}
 	exit(1) if($r); #exit with $r would be tricky as bash sees only 8 bits, instead of converting we just return 1
 	if($makeplots eq 'true'){
-		my $cmd = "$plots_bin $dir_run/$cohort.$mode.tranches";
+		my $cmd = "$plots_bin $dir_run/$cohort.$mode.all.tranches";
 		$r = $Syscall->run($cmd, 1);
 		exit(1) if($r);
 	}
@@ -213,7 +213,7 @@ sub apply{
 	#select samples and variants from the cohort
 	if($mode eq 'SNP'){
 		$cmd = $Config->read("step:$step", "gatk_bin");
-		$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.all.vqsr.vcf.gz -O $dir_run/$cohort.$split.vqsr.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true --remove-unused-alternates true";
+		$cmdx = " SelectVariants --tmp-dir $dir_tmp -R $reference -V $dir_run/$cohort.$split.all.vqsr.vcf.gz -O $dir_run/$cohort.$split.vqsr.vcf.gz -sn ".join(" -sn ", @indv)." --exclude-non-variants true"; # --remove-unused-alternates true"; #SelectVariants can't properly deal with INFO/AS_BaseQRankSum fields
 		$cmdx =~ s/\s+-/ \\\n  -/g;
 		$cmd .= $cmdx;
 		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
