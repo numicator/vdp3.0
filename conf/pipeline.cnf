@@ -621,3 +621,10 @@ bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
 vep_bin=$[tools]vep
 fasta=$[directories]vep_db/Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz
+
+[pipe_shepherd]
+dir=pipe_shepherd
+pbs_queue=$[global]pbs_queue
+pbs_mem=2GB
+pbs_ncpus=1
+pbs_walltime=1:00:00
