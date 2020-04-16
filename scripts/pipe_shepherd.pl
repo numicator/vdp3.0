@@ -73,7 +73,8 @@ print Q "#PBS -e $fname.err\n\n";
 print Q "source $confdir/".$Config->read('global', "env_file")."\n";
 print Q "cd $dir_shepherd\n";
 print Q "echo \"pwd: \$(pwd)\" >&2\n\n";
-print Q "echo \"$me\n";
+print Q "echo \"$me\n\" >&2";
+print Q "$me";
 
 close Q;
 
