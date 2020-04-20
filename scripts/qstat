@@ -1,0 +1,78 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+use Getopt::Long;
+
+my $QSTAT = 'qstat -f -Fdsv';
+
+GetOptions(
+  'user=s' => \my $user,
+) or die "Invalid options passed to $0\n";
+
+#$user = `whoami` if(!defined $user);
+
+my $cmd = "$QSTAT"; #.(defined $user? " -u $user": '');
+#warn "$cmd\n"; exit;
+
+my @jobs = `$cmd 2>/dev/null`;
+
+printf("%-7s %-12s %-3s %-5s %-9s %-16s %-16s %-9s %-1s %-4s %-54s %5d\n", 'job id', 'queue', 'cpu', 'mem', 'walltime', 'queued at', 'started at', 'run time', 's', 'prj', 'job name', scalar @jobs);
+printf("%-7s %-12s %-3s %-5s %-9s %-16s %-16s %-9s %-1s %-4s %s\n", '-'x7, '-'x12, '-'x3, '-'x5, '-'x9, '-'x16, '-'x16, '-'x9, '-'x1, '-'x4, '-'x60);
+foreach my $line(@jobs){
+	chomp $line;
+	$line =~ s/^Job Id:\s*/Job_Id=/;
+	my %job = $line =~ /([^=]+)=([^\|]+)\|?/g;
+	#print "printing hash:\n";foreach(keys %job){print "  $_ => $job{$_}\n"}; print "hash printed\n";
+	$job{Job_Id} =~ s/\..*//;
+	getvals(\%job, ('Job_Id', 'project', 'Job_Name', 'job_state', 'queue', 'server', 'exec_host', 'Hold_Types', 'Resource_List.mem', 'Resource_List.ncpus', 'Resource_List.walltime', 'resources_used.walltime', 'qtime', 'stime', 'Execution_Time'));
+	$job{'Resource_List.mem'} = scaleIt($job{'Resource_List.mem'});
+	$job{qtime} = shortDate($job{qtime});
+	$job{stime} = shortDate($job{stime});
+	$job{Execution_Time} = shortDate($job{Execution_Time}, 1);
+	printf("%7d %-12s %3s %5s %9s %16s %16s %9s %1s %-4s %s\n", $job{Job_Id}, $job{queue}, $job{'Resource_List.ncpus'}, $job{'Resource_List.mem'}, $job{'Resource_List.walltime'}, $job{qtime}, $job{stime}, $job{'resources_used.walltime'}, $job{job_state}, $job{project}, $job{'Job_Name'}.($job{Execution_Time} ne ''? " ($job{Execution_Time})": ""));
+}
+
+####################################################################################################
+#
+sub getvals{
+	my($h, @vars) = @_;
+	my %h;
+	
+	foreach(@vars){
+		$h->{$_} = $h->{$_}? $h->{$_}: '--';
+	}
+	return %h	
+}#getvals
+
+
+####################################################################################################
+#
+sub scaleIt{
+	my($size) = shift,;
+	my $n = 0;
+	$size =~ s/[^0-9]$//;
+	++$n and $size /= 1024 until $size < 1024;
+	return sprintf "%.0f%s", $size, (qw[b kb mb gb tb])[$n];
+}#scaleIt
+
+####################################################################################################
+#
+sub shortDate{
+	my $v = shift;
+	$v = '' if(!defined $v);
+	my @l = split ' ', $v;
+	my $x = shift;
+	if(!defined $l[1]){
+		if(!$x){
+			return '       --       '
+		}
+		else{
+			return ''
+		}
+	}
+	#return '       --       ' if(!defined $l[1]);
+	#print STDERR @l; exit;
+	my %mon2num = qw(Jan 1  Feb 2  Mar 3  Apr 4  May 5  Jun 6 Jul 7  Aug 8  Sep 9  Oct 10 Nov 11 Dec 12);
+	$l[3] =~ s/:\d{2}$//;
+	return $l[2].'/'.$mon2num{$l[1]}.'/'.$l[4].' '.$l[3];
+}#shortDate

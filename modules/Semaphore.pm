@@ -77,7 +77,7 @@ sub lock{
 			last
 		}
 	}
-
+	chmod 0660, $self->{file_name};
 	$ret = $ok? 1: 0;
 	
 	if($ok){

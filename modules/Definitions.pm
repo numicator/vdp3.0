@@ -25,13 +25,13 @@ BEGIN{
 		QJOB_ONHOLD   => 5,
 		QJOB_NOSTATUS => 99,
 
-		JOB_MAX_RERUNS => 10,   #max numbers of step runs (executions) before step is considered dead
+		JOB_MAX_RERUNS => 5,    #max numbers of step runs (executions) before step is considered dead
 		JOB_MAX_RESUB  => 10,   #max numbers of step submissions before step is considered dead
 		
 		PIPE_STOP        => 88, #error code recognized as request to stop the pipeline
 		PIPE_NO_PROGRESS => 66, #error code recognized as request to not progress the pipeline
 		
-		LOCK_MAX_AGE     => 600, #max age of lock file in seconds before lock file considered 'stale' and the lock is overrided
+		LOCK_MAX_AGE     => 600, #max age of lock file in seconds before lock file considered 'stale' and the lock can be overrided
 		
 		COHORT_RUN_START => 'START', #log entry in the the pipeline db
 		COHORT_RUN_DONE  => 'DONE',  #log entry in the the pipeline db

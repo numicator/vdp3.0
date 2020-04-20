@@ -11,8 +11,8 @@ pbs_other=gdata
 pbs_umask=0007
 pbs_group_list=xx92
 
-read_regex1=.*_R?1_.*\.f(ast)?q\.gz
-read_regex2=_R?1_
+read_regex1=.*_R?1_?.*\.f(ast)?q\.gz
+read_regex2=_R?1_?
 
 [directories]
 pipeline=/g/data/xx92/$version
@@ -580,6 +580,7 @@ cmd_1=$[directories]pipeline/scripts/step_gatkcnvploidy.pl
 #this step requires GATK python conda enviro. see below how it is switched on
 gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/conda.sh; conda activate gatk; export MKL_DYNAMIC=false; export OMP_NESTED=true; export MKL_NUM_THREADS=2; export OMP_NUM_THREADS=2; $[tools]gatk 
 contig_ploidy_model=$[directories]genome/GATK_cnv/ploidy_WES-model
+contig_ploidy_calls=$[directories]genome/GATK_cnv/ploidy_WES-calls
 
 [step:split:gatk_cnv_caller]
 dir=gatk_cnv
@@ -628,3 +629,9 @@ pbs_queue=$[global]pbs_queue
 pbs_mem=2GB
 pbs_ncpus=1
 pbs_walltime=1:00:00
+
+[cp_fastq]
+pbs_queue=copyq
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=10:00:00

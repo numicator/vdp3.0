@@ -130,6 +130,7 @@ my $username    = $Config->read("cohort", "username");
 my $time_start  = $Config->read("cohort", "time_start");
 
 my $filter_rd_cvr = $Config->read("step:report_snv", "filter_rd_cvr");
+my $cnv_model_calls = $Config->read("step:gatk_cnv_ploidy", "contig_ploidy_calls"); 
 
 $username =~ s/^([^:]+):(.+)/$2 \($1\)/;
 
@@ -438,6 +439,20 @@ my @ploidy_data;
 my @ploidy;
 push @ploidy_data, ["Chromosomal Ploidy"];
 ($final_page, $number_of_pages, $final_y) = table(\@ploidy_data, $final_y - 8);
+
+my %cnv_model_ploidy;
+open F, "cat $cnv_model_calls/SAMPLE_*/contig_ploidy.tsv | grep -vP \"^(\@)|(CONTIG)\" |" or modules::Exception->throw("Can't open 'cat $cnv_model_calls/SAMPLE_*/contig_ploidy.tsv | grep -vP \"^(\@)|(CONTIG)\" |'");
+while(<F>){
+	chomp;
+	my @a = split "\t";
+	$cnv_model_ploidy{"$a[0]-$a[1]"}{gq} += $a[2];
+	$cnv_model_ploidy{"$a[0]-$a[1]"}{n}++;
+}
+close F;
+foreach(keys %cnv_model_ploidy){
+	$cnv_model_ploidy{$_}{mean} = sprintf("%.2f", $cnv_model_ploidy{$_}{gq} / $cnv_model_ploidy{$_}{n});
+}
+
 foreach my $indv(@indv_id){
 	open F, "$dir_ploidy/$cohort-$indv\_ploidy-calls/SAMPLE_0/contig_ploidy.tsv" or modules::Exception->throw("Can't open '$dir_ploidy/$cohort-$indv\_ploidy-calls/SAMPLE_0/contig_ploidy.tsv'");
 	<F>;<F>;
@@ -447,7 +462,9 @@ foreach my $indv(@indv_id){
 		chomp;
 		$cnt++;
 		my @a = split "\t";
-		push @ploidy, sprintf("%-6s: %2s", $a[0], $a[1]);
+		my $gqr = defined $cnv_model_ploidy{"$a[0]-$a[1]"}? sprintf("%.2f", $a[2] / $cnv_model_ploidy{"$a[0]-$a[1]"}{mean}): 'NA';
+		push @ploidy, sprintf("%-6s: %2s %s%s", $a[0], $a[1], chr(0x00A0)x2, $gqr);
+		#push @ploidy, sprintf("%-6s: %2s %".chr(0x00A0)."6s", $a[0], $a[1], $gqr);
 		if(!($cnt % 8)){
 			push @ploidy_data, ['', @ploidy];
 			undef @ploidy;

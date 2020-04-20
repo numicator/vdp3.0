@@ -53,10 +53,11 @@ sub request_family_tree{
 		$h{$h[$i]} = $i;
 	}
 	foreach(@rq){
+		#chomp;
 		my @indv = split '\|', $_;
-		#warn "$_\n";
-		
-		#awefully irritating: deal with multiple sample names, keep only the name provided in the tsv file:
+		#print STDERR "   $_";
+
+		#awfully irritating: deal with multiple sample names, keep only the name provided in the tsv file:
 		my $iid = $indv[$h{IndividualName}];
 		my $fid = $indv[$h{FatherName}];
 		my $mid = $indv[$h{MotherName}];
@@ -64,6 +65,14 @@ sub request_family_tree{
 			$iid = $1 if($iid =~ /\b($smpl)\b/); #\b is a word break to avoid matching eg. CCG21 with CCG213
 			$fid = $1 if($fid =~ /\b($smpl)\b/);
 			$mid = $1 if($mid =~ /\b($smpl)\b/);
+		}
+		
+		#singles don't have family id, assign sample id as family id
+		if(!defined $indv[$h{FamilyId}] || $indv[$h{FamilyId}] eq ''){
+			$indv[$h{FamilyId}] = "single:$iid";
+		}
+		else{
+			$indv[$h{FamilyId}] = "family:$indv[$h{FamilyId}]";
 		}
 		
 		#load our familly hash:
@@ -86,10 +95,30 @@ sub request_family_trees{
 	my($self) = @_;
 	my %cohorts;
 	
+	warn "requesting family trees from APF\n";
 	foreach(keys %{$self->samples}){
+		#print STDERR " sample: $_\t";
 		my $fam  = $self->request_family_tree($_);
 		my $famid = (keys %{$fam})[0];
+		#print STDERR "family: $famid\n";
 		$cohorts{$famid} = $fam->{$famid};
+	}
+	foreach my $famid (keys %cohorts){
+		#warn "$famid\n";
+		foreach(keys %{$cohorts{$famid}}){
+			#warn " $_\n";
+			if(!defined $self->samples->{$_}){
+				warn "*** WARNING: Individual $_, member of APF family $famid (".join(", ", keys %{$cohorts{$famid}}).") is not present in the input data_file. ***\n";
+				delete $cohorts{$famid}{$_};
+			}
+		}
+	}
+	warn "cohorts to be processed:\n";
+	foreach my $famid (keys %cohorts){
+		warn " $famid\n";
+		foreach(keys %{$cohorts{$famid}}){
+			warn "  $_\n";
+		}
 	}
 	$self->{cohorts} = \%cohorts;
 }#request_family_trees
@@ -153,6 +182,7 @@ sub get_data_tsv{
 		$smpl{$s[0]}{requestid} = defined $s[2] && $s[2] ne ''? $s[2]: '';
 		$smpl{$s[0]}{cnt}++;
 		$cnt++;
+		#warn "sample: $s[0]\n";
 		for(my $i = 3; $i < scalar @s; $i++){
 			my $r1 = $s[$i];
 			$r1 =~ /^(.*)($read_regex2)/;
@@ -161,9 +191,9 @@ sub get_data_tsv{
 			$rp =~ s/1/2/;
 			my $r2 = $r1;
 			$r2 =~ s/$read_regex2/$rp/;
+			warn "$s[0]\tfastq: $r1, $r2\n";
 			$r1 = "$fqdir/$r1";
 			$r2 = "$fqdir/$r2";
-			#warn "$s[0] read file pair: $r1, $r2\n";
 			modules::Exception->throw("Can not access file $r1") if(!-e $r1);
 			modules::Exception->throw("Can not access file $r2") if(!-e $r2);
 			push @{$smpl{$s[0]}{fq}}, [$r1, $r2]

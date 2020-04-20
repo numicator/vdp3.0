@@ -297,8 +297,8 @@ while(<I>){
 			$cnt_all++;
 			print O join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
 			print O "\t$csqs[$i]\n";
-			if((defined $a[$vepfld{Protein_position}] && $a[$vepfld{Protein_position}] ne '') || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
-				#warn "$a[$vepfld{Protein_position}]\t$a[$vepfld{Consequence}]\n";
+			#if((defined $a[$vepfld{Protein_position}] && $a[$vepfld{Protein_position}] ne '') || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
+			if((defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /coding_sequence_variant/) || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
 				$cnt_coding++;
 				print C join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
 				print C "\t$csqs[$i]\n";

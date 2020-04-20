@@ -6,7 +6,7 @@ export PATH="/g/data/xx92/vdp3.0/software/pythonlib/bin:/g/data/xx92/vdp3.0/soft
 #environment for theano; theano use used by GATK cnv caller and is a royal pain in the ass
 export THEANO_FLAGS="base_compiledir=/g/data/xx92/vdp3.0/software/theanorc"
 if [ ! -v $PBS_JOBFS ]; then
-  echo "running as a PBS job, seeting theanorc to $PBS_JOBFS/theanorc" >&2
+  #echo "running as a PBS job, seeting theanorc to $PBS_JOBFS/theanorc" >&2
   mkdir -p $PBS_JOBFS/theanorc
   export THEANO_FLAGS="base_compiledir=$PBS_JOBFS/theanorc"
 fi

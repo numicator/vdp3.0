@@ -44,7 +44,8 @@ chomp $njob;
 #warn "njob: $njob\n";
 if((defined $njob && $njob ne '') && (defined $jobid && $njob > 1 || !defined $jobid && $njob > 0)){
 	warn "\n******************************************************************************************\n";
-	warn "***   WARNING: another pipe_shepherd has been submitted. This one will not resubmit    ***\n";
+	warn "***   WARNING: another $BASE.qsub has been submitted.\n"; 
+	warn "***   This one will not resubmit.\n";
 	warn "******************************************************************************************\n\n";
 	exit 0;
 }
@@ -73,7 +74,7 @@ print Q "#PBS -e $fname.err\n\n";
 print Q "source $confdir/".$Config->read('global', "env_file")."\n";
 print Q "cd $dir_shepherd\n";
 print Q "echo \"pwd: \$(pwd)\" >&2\n\n";
-print Q "echo \"$me\n\" >&2";
+print Q "echo \"$me\" >&2\n";
 print Q "$me";
 
 close Q;

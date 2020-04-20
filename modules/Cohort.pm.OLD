@@ -8,7 +8,6 @@ use File::Copy qw(cp);
 use modules::Definitions;
 use modules::Exception;
 use modules::Individual;
-use modules::SystemCall;
 use Data::Dumper;
 
 sub new{
@@ -57,7 +56,7 @@ sub has_completed{
 	my $file = $self->workdir.'/'.$self->id.'.done';
 	$r = 1 if(-s $file);
 	return $r;
-}#has_completed
+}#is_completed
 
 sub set_completed{
 	my($self) = shift;
@@ -76,33 +75,8 @@ sub reset_completed{
 	warn 'cohort '.$self->id." reset complete marker file\n";
 }#reset_completed
 
-sub has_notready_fastq{
-	my($self) = shift;
-	my $r = 0;
-	my $file = $self->workdir.'/'.$self->id.'.fastq_notready';
-	$r = 1 if(-s $file);
-	return $r;
-}#has_notready_fastq
-
-sub set_notready_fastq{
-	my($self) = shift;
-	my $file  = $self->workdir.'/'.$self->id.'.fastq_notready';
-	my $ts    = modules::Utils::get_time_stamp;
-	open O, ">$file" or modules::Exception->throw("Can't open $file for writing\n");
-	print O $ts;
-	close O;
-	warn 'cohort '.$self->id." set fastq_notready marker file\n";
-}#set_notready_fastq
-
-sub reset_notready_fastq{
-	my($self) = shift;
-	my $file  = $self->workdir.'/'.$self->id.'.fastq_notready';
-	unlink($file) or modules::Exception->throw("Can't unlink $file\n");
-	warn 'cohort '.$self->id." reset fastq_notready marker file\n";
-}#reset_notready_fastq
-
 sub make_workdir{
-	my($self, $overwrite, $cp_qsub) = @_;
+	my($self, $overwrite) = @_;
 	
 	my $cohort     = $self->id;
 	my $config     = $self->config;
@@ -144,9 +118,6 @@ sub make_workdir{
 	make_path("$dir_work/$cohort/$dir_run/$dir_tmp");
 	make_path("$dir_work/$cohort/$dir_result");
 	
-	#imiedietly mark cohort as not ready for porcessing:
-	$self->set_notready_fastq;
-	
 	#directiry structure for reads
 	make_path("$dir_work/$cohort/$dir_reads");
 	foreach my $indv(keys %{$self->ped->ped->{$self->id}}){
@@ -176,76 +147,26 @@ sub make_workdir{
 	}
 	
 	#copy read files from their original loacation (from Vardb object) to cohort work location
-	if($cp_qsub){
-		($cfn, $cdir) = fileparse($self->ped->file_name);
-		$cfn =~ s/\.pedx/\.cp-fastq/;
-		warn "copy of the fastq files will be performed by a qsub job $cfn.qsub\n";
-		
-		open Q, ">$dir_work/$cohort/$cfn.qsub" or modules::Exception->throw("Can't open: '$dir_work/$cohort/$cfn.qsub' for writing");
-		print Q $self->config->read('global', "pbs_shebang")."\n";
-		print Q "#PBS -P ".$self->config->read('global', "pbs_project")."\n";
-		print Q "#PBS -q ".$self->config->read("cp_fastq", "pbs_queue")."\n";
-		print Q "#PBS -l walltime=".$self->config->read("cp_fastq", "pbs_walltime").",mem=".$self->config->read("cp_fastq", "pbs_mem").",ncpus=".$self->config->read("cp_fastq", "pbs_ncpus")."\n";
-		print Q "#PBS -l storage=".$self->config->read('global', "pbs_storage")."\n";
-		print Q "#PBS -l other=".$self->config->read('global', "pbs_other")."\n";
-		print Q "#PBS -W umask=".$self->config->read('global', "pbs_umask")."\n";
-		print Q "#PBS -o $dir_work/$cohort/$cfn.out\n";
-		print Q "#PBS -e $dir_work/$cohort/$cfn.err\n\n";
-	}
-	else{
-		warn "copy of the fastq files will be performed immediately without invoking a qsub job\n";
-	}
-	foreach my $smpl(keys %{$self->{fqfiles}}){
-		warn "  $smpl - copying fastq files\n";
-		foreach(@{$self->{fqfiles}->{$smpl}}){
-			warn "    ".basename($_->[0]). " ".basename($_->[1])."\n";
-			if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])){
-				if($cp_qsub){
-					print Q "echo cp -n $_->[0] $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." >&2\n";
-					print Q "cp -n $_->[0] $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])."\n";
-					print Q "echo chmod 0660 $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." >&2\n";
-					print Q "chmod 0660 $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])."\n";
-				}
-				else{
+	if(defined $self->{fqfiles}){
+		foreach my $smpl(keys %{$self->{fqfiles}}){
+			warn "  $smpl - copying fastq files\n";
+			foreach(@{$self->{fqfiles}->{$smpl}}){
+				warn "    ".basename($_->[0]). " ".basename($_->[1])."\n";
+				if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])){
 					cp($_->[0], "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." $!");
 					chmod 0660, "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0]) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])." $!");
 				}
-			}
-			else{
-				warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])."\n";
-			}
-			if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])){
-				if($cp_qsub){
-					print Q "echo cp -n $_->[1] $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." >&2\n";
-					print Q "cp -n $_->[1] $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n";
-					print Q "echo chmod 0660 $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." >&2\n";
-					print Q "chmod 0660 $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n\n";
-				}
 				else{
+					warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[0])."\n";
+				}
+				if($overwrite || !-s "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])){
 					cp($_->[1], "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." $!");
 					chmod 0660, "$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1]) or modules::Exception->throw("$dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])." $!");
 				}
+				else{
+					warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n";
+				}
 			}
-			else{
-				warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n";
-			}
-		}
-		if($cp_qsub){
-			#my $pipe_progress = modules::Utils::scriptdir."/pipe_progress.pl";
-			print Q "echo rm -rf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
-			print Q "rm -rf $dir_work/$cohort/$cohort.fastq_notready\n";
-			print Q "echo copy of fastq files done >&2\n";
-			close Q;
-			my $r = system("qsub $dir_work/$cohort/$cfn.qsub >/dev/null");
-			if($r){
-				modules::Exception->throw("qsub $dir_work/$cohort/$cfn.qsub failed");
-			}
-			else{
-				warn "    qsub submitted the job to copy fastq files\n";
-			}
-		}
-		else{
-			$self->set_notready_fastq;
 		}
 	}
 }#make_workdir

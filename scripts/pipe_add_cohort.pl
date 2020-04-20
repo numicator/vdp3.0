@@ -30,6 +30,8 @@ GetOptions(\%OPT,
 	   		"overwrite",
 	   		"delete",
 	   		"submit",
+	   		"qsub_copy",
+	   		"dryrun"
 	   		);
 	   		
 pod2usage(-verbose => 2) if $OPT{man};
@@ -82,14 +84,6 @@ warn "pipeline version: '$pversion', codebase: '$codebase'\n";
 modules::Exception->throw("Expected either argument 'cohort' xor 'data_file'") if(defined $OPT{cohort} && defined $OPT{data_file} || !defined $OPT{cohort} && !defined $OPT{data_file});
 modules::Exception->throw("Argument 'delete' must be used with argument 'cohort'") if(!defined $OPT{cohort} && defined $OPT{'delete'});
 
-#my $dbfile = "$dir_cohorts/$pversion.db";
-#
-#my $Semaphore = modules::Semaphore->new($dbfile);
-#if(!$Semaphore->lock(0)){
-#	warn "couldn't apply lock to semaphore file '".$Semaphore->file_name."'; exiting\n";
-#	die;
-#}
-
 my $Pipeline = modules::Pipeline->new(config => $Config);
 $Pipeline->database_lock;
 
@@ -104,10 +98,7 @@ if(defined $OPT{data_file}){
 	my $id = $Pipeline->database_lastcohort($project);
 	modules::Exception->throw("couldn't read from database the last cohort number for project $project") if(!defined $id);
 	$id++;
-	warn "next cohort number for project $project is $id\n";
-	#my $O;
-	#open $O, ">>$dbfile" or modules::Exception->throw("Couldn't access database file '$dbfile' for writing");
-	#$O->autoflush(1);
+	warn "next available cohort number for project $project is $id\n";
 	foreach my $famid(keys %{$Vardb->cohorts}){
 		my $cohort = sprintf("%s_cohort%04d", $project, $id);
 		warn "creting cohort $cohort ($famid)\n";
@@ -125,26 +116,28 @@ if(defined $OPT{data_file}){
 			#$Vardb->samples->{$_}->{$fq};
 			$fqfiles{$_} = $Vardb->samples->{$_}->{fq};
 		}
-		
-		my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles);
-		$Pipeline->set_cohort(cohort => $Cohort);
-		$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
-		$Cohort->make_workdir($OPT{overwrite});
-		$Cohort->add_individuals_ped;
-		$Cohort->config_add_readfiles;
-		$Pipeline->get_pipesteps;
-		$Pipeline->make_qsubs(1);
-		$Pipeline->config->reload;
-		
-		if(defined $OPT{submit}){
-			warn "starting the pipeline - submitting the first step\n";
-			my($step_completed, $step_next) = $Pipeline->check_current_step;
-			$Pipeline->submit_step($step_next);
+		if(defined $OPT{dryrun}){
+			warn "*** dryrun - no actuall actions to be performed ***\n";
 		}
-
+		else{
+			my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles);
+			$Pipeline->set_cohort(cohort => $Cohort);
+			$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
+			$Cohort->make_workdir($OPT{overwrite}, $OPT{qsub_copy});
+			$Cohort->add_individuals_ped;
+			$Cohort->config_add_readfiles;
+			$Pipeline->get_pipesteps;
+			$Pipeline->make_qsubs(1);
+			$Pipeline->config->reload;
+			
+			if(defined $OPT{submit}){
+				warn "starting the pipeline - submitting the first step\n";
+				my($step_completed, $step_next) = $Pipeline->check_current_step;
+				$Pipeline->submit_step($step_next);
+			}
+		}
 		$id++;
-	}
-	#close $O;
+	}#foreach my $famid(keys %{$Vardb->cohorts})
 	#die "greaceful death\n";
 }
 
@@ -188,10 +181,8 @@ if(defined $OPT{cohort}){
 	#$Pipeline->pipe_start() if(defined $OPT{submit});
 }
 
-#$Pipeline->database_unlock;
-
 END{
-	$Pipeline->database_unlock;
+	$Pipeline->database_unlock if(defined $Pipeline);
 	warn "done script ".basename(__FILE__)."\n"
 }
 

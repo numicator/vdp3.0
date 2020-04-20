@@ -125,6 +125,9 @@ foreach my $cohort(@cohorts){
 	if($Cohort->has_completed){
 		warn "cohort '$cohort' has already completed the pipeline\n";
 	}
+	elsif($Cohort->has_notready_fastq){
+		warn "cohort '$cohort' has not yet completed copying of the fastq files\n";
+	}
 	else{
 		$Cohort->add_individuals_ped();
 		$Pipeline->set_cohort(cohort => $Cohort);

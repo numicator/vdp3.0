@@ -229,7 +229,7 @@ sub check_current_step{
 		$stn = $pipesteps->[$step_next][0];
 	}
 	undef $stn if($pipe_stop_signal);
-	warn "step '$pipesteps->[$step_next][1]' will not run.\n" if(!defined $stn);
+	warn "jobs from step '$pipesteps->[$step_next][1]' are not going to be started now\n" if(!defined $stn);
 	return($stc, $stn);
 }#check_current_step
 
