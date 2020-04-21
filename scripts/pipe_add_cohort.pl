@@ -124,18 +124,20 @@ if(defined $OPT{data_file}){
 			$Pipeline->set_cohort(cohort => $Cohort);
 			$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
 			$Cohort->make_workdir($OPT{overwrite}, $OPT{qsub_copy});
-			$Cohort->add_individuals_ped;
-			$Cohort->config_add_readfiles;
-			$Pipeline->get_pipesteps;
-			$Pipeline->make_qsubs(1);
-			$Pipeline->config->reload;
+			if(!defined $OPT{qsub_copy}){
+				$Cohort->add_individuals_ped;
+				$Cohort->config_add_readfiles;
+				$Pipeline->get_pipesteps;
+				$Pipeline->make_qsubs(1);
+				$Pipeline->config->reload;
 			
-			if(defined $OPT{submit}){
-				warn "starting the pipeline - submitting the first step\n";
-				my($step_completed, $step_next) = $Pipeline->check_current_step;
-				$Pipeline->submit_step($step_next);
-			}
-		}
+				if(defined $OPT{submit}){
+					warn "starting the pipeline - submitting the first step\n";
+					my($step_completed, $step_next) = $Pipeline->check_current_step;
+					$Pipeline->submit_step($step_next);
+				}
+			}#if(!defined $OPT{qsub_copy})
+		}#else if(defined $OPT{dryrun})
 		$id++;
 	}#foreach my $famid(keys %{$Vardb->cohorts})
 	#die "greaceful death\n";

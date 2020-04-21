@@ -368,10 +368,24 @@ sub database_record{
 	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
 	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
 	my $DB;
-	open $DB, ">>", $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for writing");
-	$DB->autoflush(1);
-	print $DB $self->cohort->id."\t$status\t".modules::Utils::get_time_stamp."\t$data\n";
+	my $record_present = 0;
+	open $DB, $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for reading");
+	while(<$DB>){
+		chomp;
+		my @a = split "\t";
+		if($a[0] eq $self->cohort->id && $a[1] eq $status){
+			warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' already present, no new record will be added\n";
+			$record_present = 1;
+			last;
+		}
+	}
 	close $DB;
+	if(! $record_present){
+		open $DB, ">>", $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for writing");
+		$DB->autoflush(1);
+		print $DB $self->cohort->id."\t$status\t".modules::Utils::get_time_stamp."\t$data\n";
+		close $DB;
+	}
 }#database_record
 
 sub database_lock{

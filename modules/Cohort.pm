@@ -191,6 +191,7 @@ sub make_workdir{
 		print Q "#PBS -W umask=".$self->config->read('global', "pbs_umask")."\n";
 		print Q "#PBS -o $dir_work/$cohort/$cfn.out\n";
 		print Q "#PBS -e $dir_work/$cohort/$cfn.err\n\n";
+		#print Q "#PBS -e exit\n\n";
 	}
 	else{
 		warn "copy of the fastq files will be performed immediately without invoking a qsub job\n";
@@ -230,23 +231,25 @@ sub make_workdir{
 				warn "    NOT overwriting existing file $dir_work/$cohort/$dir_reads/$smpl/".basename($_->[1])."\n";
 			}
 		}
-		if($cp_qsub){
-			#my $pipe_progress = modules::Utils::scriptdir."/pipe_progress.pl";
-			print Q "echo rm -rf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
-			print Q "rm -rf $dir_work/$cohort/$cohort.fastq_notready\n";
-			print Q "echo copy of fastq files done >&2\n";
-			close Q;
-			my $r = system("qsub $dir_work/$cohort/$cfn.qsub >/dev/null");
-			if($r){
-				modules::Exception->throw("qsub $dir_work/$cohort/$cfn.qsub failed");
-			}
-			else{
-				warn "    qsub submitted the job to copy fastq files\n";
-			}
+	}#foreach my $smpl(keys %{$self->{fqfiles}})
+	if($cp_qsub){
+		print Q "echo rm -rf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
+		print Q "rm -f $dir_work/$cohort/$cohort.fastq_notready\n";
+		print Q "echo copy of fastq files done >&2\n\n";
+		print Q "echo finishing cohort setup and starting the pipeline: >&2\n";
+		print Q "source ".modules::Utils::confdir."/".$self->config->read('global', "env_file")."\n";
+		print Q modules::Utils::scriptdir."/pipe_add_cohort.pl --cohort $cohort --submit\n";
+		close Q;
+		my $r = system("qsub $dir_work/$cohort/$cfn.qsub >/dev/null");
+		if($r){
+			modules::Exception->throw("qsub $dir_work/$cohort/$cfn.qsub failed");
 		}
 		else{
-			$self->set_notready_fastq;
+			warn "  qsub submitted job '$cfn.qsub' to copy the fastq files and start the pipeline\n";
 		}
+	}
+	else{
+		$self->set_notready_fastq;
 	}
 }#make_workdir
 
