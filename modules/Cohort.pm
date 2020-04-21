@@ -179,7 +179,7 @@ sub make_workdir{
 	if($cp_qsub){
 		($cfn, $cdir) = fileparse($self->ped->file_name);
 		$cfn =~ s/\.pedx/\.cp-fastq/;
-		warn "copy of the fastq files will be performed by a qsub job $cfn.qsub\n";
+		warn "copy of the fastq files and finishing of the cohort setup will be performed by a qsub job $cfn.qsub\n";
 		
 		open Q, ">$dir_work/$cohort/$cfn.qsub" or modules::Exception->throw("Can't open: '$dir_work/$cohort/$cfn.qsub' for writing");
 		print Q $self->config->read('global', "pbs_shebang")."\n";
@@ -233,8 +233,9 @@ sub make_workdir{
 		}
 	}#foreach my $smpl(keys %{$self->{fqfiles}})
 	if($cp_qsub){
-		print Q "echo rm -rf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
-		print Q "rm -f $dir_work/$cohort/$cohort.fastq_notready\n";
+		print Q "echo rm -vf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
+		print Q "rm -vf $dir_work/$cohort/$cohort.fastq_notready >&2\n";
+		#print Q "ls -l $dir_work/$cohort/$cohort.fastq_notready\n";
 		print Q "echo copy of fastq files done >&2\n\n";
 		print Q "echo finishing cohort setup and starting the pipeline: >&2\n";
 		print Q "source ".modules::Utils::confdir."/".$self->config->read('global', "env_file")."\n";
@@ -249,7 +250,7 @@ sub make_workdir{
 		}
 	}
 	else{
-		$self->set_notready_fastq;
+		$self->reset_notready_fastq;
 	}
 }#make_workdir
 

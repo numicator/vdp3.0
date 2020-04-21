@@ -27,6 +27,7 @@ qsub=qsub
 run=run
 result=result
 tmp=tmp
+mdss=$version
 
 [references]
 gatkbundle=GATK_bundle_v0
@@ -60,7 +61,7 @@ bedtools=$[directories]tools/bedtools2/bin/bedtools
 bcftools=$[directories]tools/bcftools-1.10.2/bcftools
 bgzip=$[directories]tools/htslib-1.10.2/bgzip
 tabix=$[directories]tools/htslib-1.10.2/tabix
-gatk=$[directories]tools/gatk-4.1.5.0/gatk
+gatk=$[directories]tools/gatk-4.1.6.0/gatk
 varscan=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/VarScan.v2.4.4.jar
 strelka=$[directories]tools/strelka-2.9.10/bin
 vep=$[directories]tools/ensembl-vep-release-99.2/vep
@@ -87,6 +88,19 @@ GnomAD=3.0
 CADD=v1.5
 ClinVar=2020.03.10
 Cosmic=v90
+
+[pipe_shepherd]
+dir=pipe_shepherd
+pbs_queue=$[global]pbs_queue
+pbs_mem=2GB
+pbs_ncpus=1
+pbs_walltime=1:00:00
+
+[cp_fastq]
+pbs_queue=copyq
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=10:00:00
 
 [split]
 01=split:1_21
@@ -163,35 +177,35 @@ intervals=chr16,chr17,chr19,chr20
 [steps]
 1:readfile=fastqc
 2:readfile=bwa
-4:individual=merge_bam
-5:cohort=merge_target
-6:individual=mark_duplicates
-7:individual=split:bqsr_recal
-8:individual=bqsr_gather_rep
-9:individual=split:bqsr_apply
-10:individual=bqsr_gather_bam
-11:individual=split:filter_bam
-12:cohort=split:mpileup
-13:individual=split:gatk_hc
-14:cohort=split:gatk_combine_gvcfs
-15:cohort=split:gatk_genotype_gvcfs
-16:cohort=gatk_vqsr_recal_indel
-17:cohort=gatk_vqsr_recal_snp
-18:cohort=split:gatk_vqsr_apply_indel
-19:cohort=split:gatk_vqsr_apply_snp
-20:cohort=split:varscan_indel
-21:cohort=split:varscan_snp
-22:cohort=split:strelka
-23:cohort=split:merge_callers
-24:cohort=split:vep
-25:cohort=report_snv
-#26:cohort=gatk_cnv_intervals
-27:individual=gatk_cnv_read_counts
-28:individual=gatk_cnv_ploidy
-29:individual=split:gatk_cnv_caller
-30:individual=gatk_cnv_gather_calls
-31:cohort=report_cnv
-99:cohort=summary_report
+3:individual=merge_bam
+4:cohort=merge_target
+5:individual=mark_duplicates
+6:individual=split:bqsr_recal
+7:individual=bqsr_gather_rep
+8:individual=split:bqsr_apply
+9:individual=bqsr_gather_bam
+10:individual=split:filter_bam
+11:cohort=split:mpileup
+12:individual=split:gatk_hc
+13:cohort=split:gatk_combine_gvcfs
+14:cohort=split:gatk_genotype_gvcfs
+15:cohort=gatk_vqsr_recal_indel
+16:cohort=gatk_vqsr_recal_snp
+17:cohort=split:gatk_vqsr_apply_indel
+18:cohort=split:gatk_vqsr_apply_snp
+19:cohort=split:varscan_indel
+20:cohort=split:varscan_snp
+21:cohort=split:strelka
+22:cohort=split:merge_callers
+23:cohort=split:vep
+24:cohort=report_snv
+25:individual=gatk_cnv_read_counts
+26:individual=gatk_cnv_ploidy
+27:individual=split:gatk_cnv_caller
+28:individual=gatk_cnv_gather_calls
+29:cohort=report_cnv
+30:cohort=summary_report
+31:cohort=archive
 
 [step:fastqc]
 dir=fastqc
@@ -328,8 +342,8 @@ pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkhaplotypecaller.pl
 #there is an error in gatk-4.1.5 rendering HaplotypeCaller useless, we use gatk-4.1.4 instead
-#gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+#gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 read_filter_add=MateDifferentStrandReadFilter
 
 [step:split:gatk_combine_gvcfs]
@@ -342,8 +356,8 @@ pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkcombinegvcfs.pl
 #there is an error in gatk-4.1.5 rendering GenomicsDBImport useless, we use gatk-4.1.4 instead
-#gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+#gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:split:gatk_genotype_gvcfs]
 dir=gatk_hc
@@ -623,15 +637,12 @@ tabix_bin=$[tools]tabix
 vep_bin=$[tools]vep
 fasta=$[directories]vep_db/Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz
 
-[pipe_shepherd]
-dir=pipe_shepherd
-pbs_queue=$[global]pbs_queue
+[step:archive]
+dir=$[directories]tmp
+pbs_queue=copyq
 pbs_mem=2GB
 pbs_ncpus=1
-pbs_walltime=1:00:00
-
-[cp_fastq]
-pbs_queue=copyq
-pbs_mem=8GB
-pbs_ncpus=1
 pbs_walltime=10:00:00
+pbs_jobfs=100GB
+mdss_project=u86
+cmd_1=$[directories]pipeline/scripts/step_archive.pl
