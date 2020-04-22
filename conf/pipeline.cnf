@@ -1,7 +1,9 @@
 [global]
+#global settings affecting the whole pipeline
 version=vdp3.0
 env_file=environment.txt
 
+#PBS job settings
 pbs_shebang=#!/bin/bash
 #pbs_project=xx92
 pbs_project=u86
@@ -11,39 +13,50 @@ pbs_other=gdata
 pbs_umask=0007
 pbs_group_list=xx92
 
-read_regex1=.*_R?1[_\.].*\.f(ast)?q\.gz
+#REGEX to match format of fastq file names
+#match full name of the R1 file:
+read_regex1=.*_R?1[_\.].*f(ast)?q\.gz
+#match the '_R1' part of the R1 filename (to change it to '_R2' to get the second file):
 read_regex2=_R?1[_\.]
 
 [directories]
+#pipeline directory structure
 pipeline=/g/data/xx92/$version
-#reads=/g/data/xx92/ma8803/reads
 work=/g/data/xx92/data/$version
 tools=/g/data/xx92/vdp3.0/software
 genome=/g/data/xx92/vdp3.0/GRCh38
 vep_index=$[directories]genome/vep_index
 vep_db=$[directories]genome/vep_db
+
+#the dirs below are located in the cohort working directory
 reads=reads
 qsub=qsub
 run=run
 result=result
 tmp=tmp
+
+#location of pipeline backups on mdss
 mdss=$version
 
 [references]
+#references used by the pipeline
+#pipeline uses GATK bundle, this is directory location within the 'genome' dir
 gatkbundle=GATK_bundle_v0
+#location of the genome fasta (must be from the GATK bundle)
 genome_fasta=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.fasta
 wgs_calling_regions=$[directories]genome/$[references]gatkbundle/wgs_calling_regions.hg38.interval_list
+#below are refs used by GATK BQSR and VQSR processes
 bqsr_known_sites=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;$[directories]genome/$[references]gatkbundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz;$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.known_indels.vcf.gz
 vqsr_known_sites_snp=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;$[directories]genome/$[references]gatkbundle/hapmap_3.3.hg38.vcf.gz;$[directories]genome/$[references]gatkbundle/1000G_omni2.5.hg38.vcf.gz;$[directories]genome/$[references]gatkbundle/1000G_phase1.snps.high_confidence.hg38.vcf.gz
 vqsr_known_sites_indel=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;$[directories]genome/$[references]gatkbundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz;$[directories]genome/$[references]gatkbundle/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz
 
 [targets]
-#calling regions in BED format:
+#calling regions in BED format the 'WES' is an alias for SureSelect_Clinical_Research_Exome_V2 - it must be changed if the exome capture kit changes
 SureSelect_Clinical_Research_Exome_V2=$[directories]genome/targets/S30409818_Padded.bed
 WES=$[targets]SureSelect_Clinical_Research_Exome_V2
 WGS=$[directories]genome/targets/wgs.bed
 
-#regions in interval format to calculate picard Hybrid-selection 'CollectHsMetrics' statistics:
+#regions in interval format to calculate picard Hybrid-selection 'CollectHsMetrics' statistics (depend on exome capture kit):
 hs_bait=$[directories]genome/targets/S30409818_Covered.interval_list
 hs_target=$[directories]genome/targets/S30409818_Regions_named.interval_list
 
@@ -53,6 +66,7 @@ hs_target=$[directories]genome/targets/S30409818_Regions_named.interval_list
 cnv_target = $[directories]genome/GATK_cnv/cnv_WES.interval_list
 
 [tools]
+#all (major) software tools are defined here, the pipeline step sections refer to them here
 fastqc=$[directories]tools/FastQC/fastqc
 bwa=$[directories]tools/bwa-0.7.17/bwa
 picard=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/picard.jar
@@ -61,13 +75,17 @@ bedtools=$[directories]tools/bedtools2/bin/bedtools
 bcftools=$[directories]tools/bcftools-1.10.2/bcftools
 bgzip=$[directories]tools/htslib-1.10.2/bgzip
 tabix=$[directories]tools/htslib-1.10.2/tabix
+
 gatk=$[directories]tools/gatk-4.1.6.0/gatk
+#warning: the pipeline also quietly uses GATK 4.1.4 for haplotype calling, the newer versions have errors causing crashes
+
 varscan=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/VarScan.v2.4.4.jar
 strelka=$[directories]tools/strelka-2.9.10/bin
 vep=$[directories]tools/ensembl-vep-release-99.2/vep
 peddy=export PYTHONPATH="\$PYTHONPATH:$[directories]tools/peddy"; python3.7 -m peddy
 
 [tool_versions]
+#commands to get versions of the tools - these commands are called to get the veresions
 FastQC=$[tools]fastqc -v | cut -d ' ' -f 2
 BWA=$[tools]bwa 2>&1 | grep Version: | awk '{print \$2}'
 Picard=$[tools]picard MarkDuplicates --version 2>&1
@@ -81,6 +99,7 @@ Ensembl_VEP=echo '99.2'
 peddy=$[tools]peddy --version 2>/dev/null | awk '{print \$NF}'
 
 [db_versions]
+#versions of the databases, must be corrected manually when updating databases
 Genome_Reference=Homo Sampiens GRCh38
 GATK_bundle=hg38/v0
 Ensembl_VEP=99_GRCh38
@@ -90,6 +109,7 @@ ClinVar=2020.03.10
 Cosmic=v90
 
 [pipe_shepherd]
+#the pipe_shepherd process particulars
 dir=pipe_shepherd
 pbs_queue=$[global]pbs_queue
 pbs_mem=2GB
@@ -97,12 +117,15 @@ pbs_ncpus=1
 pbs_walltime=1:00:00
 
 [cp_fastq]
+#particulars of the jobs to copy fastq files
 pbs_queue=copyq
 pbs_mem=8GB
 pbs_ncpus=1
 pbs_walltime=10:00:00
 
 [split]
+#definition of genome splits, can be changed to get less or more splits processed in paralel
+#note that CNV uses it's own splits (defined in the split sections below). CNV splits MUST be defined according to GATK CNV workflow
 01=split:1_21
 02=split:2_18
 03=split:3_14
@@ -175,6 +198,14 @@ cnv=$[directories]genome/GATK_cnv/cnv_WES.10.interval_list
 intervals=chr16,chr17,chr19,chr20
 
 [steps]
+#definition of the pipeline steps.
+#actual order of lines is not important, steps are executed in the order of the prefix numbers
+#each step must be defined in a separate section (see below)
+#steps must belong to one of three categories 
+# - readfile   - step performed on each pair of fastq files
+# - individual - step performed on each individual (sample) which must contain one or more of fastq file pairs
+# - cohort     - step performed on cohort which must contain one or more individuals
+# any step may be 'split' meaning it will be performed on splits in paralel
 1:readfile=fastqc
 2:readfile=bwa
 3:individual=merge_bam
@@ -207,7 +238,14 @@ intervals=chr16,chr17,chr19,chr20
 30:cohort=summary_report
 31:cohort=archive
 
+#below are sections defining the steps
+#each step must contain it's dir (default location where it will output it's files) located inside of the run directory of the cohort
+#the cmd_1 line defines name of the script to be executed in that step
+#all major tools used by the step must be defined in the section, they may, or even should refer to the tools section
+#step may, but should not refer directly to the tolls in the tool section
+
 [step:fastqc]
+#run fastqc on each pair of fastq files
 dir=fastqc
 pbs_queue=$[global]pbs_queue
 pbs_mem=2GB
@@ -219,6 +257,7 @@ cmd_1=$[directories]pipeline/scripts/step_fastqc.pl
 fastqc_bin=$[tools]fastqc
 
 [step:bwa]
+#run BWA on each pair of fastq files
 dir=bwa
 pbs_queue=$[global]pbs_queue
 pbs_mem=32GB
@@ -231,6 +270,7 @@ bwa_bin=$[tools]bwa
 picard_bin=$[tools]picard
 
 [step:merge_bam]
+#for each sample merge bams from possibly many pairs of fastq files
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -242,6 +282,8 @@ cmd_1=$[directories]pipeline/scripts/step_mergebam.pl
 picard_bin=$[tools]picard
 
 [step:merge_target]
+#intersect targets to get finall calling regions
+#it's necessary to deal with mixed WES/WGS data
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=1GB
@@ -254,6 +296,7 @@ bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
 
 [step:mark_duplicates]
+#mark duplicated in individual bam files
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -265,6 +308,7 @@ cmd_1=$[directories]pipeline/scripts/step_markduplicates.pl
 picard_bin=$[tools]picard
 
 [step:split:bqsr_recal]
+#bam BQSR step recall
 dir=bqsr
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -276,6 +320,7 @@ cmd_1=$[directories]pipeline/scripts/step_bqsrrecal.pl
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -XX:+UseParallelGC -XX:ParallelGCThreads=4 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:bqsr_gather_rep]
+#bam BQSR step gather reports
 dir=bqsr
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -287,6 +332,7 @@ cmd_1=$[directories]pipeline/scripts/step_bqsrgatherrep.pl
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:split:bqsr_apply]
+#bam BQSR step apply recalibration
 dir=bqsr
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -298,6 +344,7 @@ cmd_1=$[directories]pipeline/scripts/step_bqsrapply.pl
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -XX:+UseParallelGC -XX:ParallelGCThreads=4 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:bqsr_gather_bam]
+#bam BQSR step gather split bams
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -309,6 +356,7 @@ cmd_1=$[directories]pipeline/scripts/step_bqsrgatherbam.pl
 picard_bin=$[tools]picard
 
 [step:split:filter_bam]
+#filter bams according to criteria defined here
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=4GB
@@ -317,11 +365,13 @@ pbs_walltime=08:00:00
 pbs_jobfs=100GB
 cmd_1=$[directories]pipeline/scripts/step_filterbam.pl
 samtools_bin=$[tools]samtools
+#the filtering criteria:
 incl_flags=PROPER_PAIR
 excl_flags=UNMAP,MUNMAP,SECONDARY,QCFAIL,DUP,SUPPLEMENTARY
 min_MQ=10
 
 [step:split:mpileup]
+#make mpilups needed by varscan
 dir=bam
 pbs_queue=$[global]pbs_queue
 pbs_mem=4GB
@@ -333,6 +383,7 @@ mpileup_bin=$[tools]samtools
 min_BQ=13
 
 [step:split:gatk_hc]
+#run GATK haplotype caller
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -342,11 +393,13 @@ pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkhaplotypecaller.pl
 #there is an error in gatk-4.1.5 rendering HaplotypeCaller useless, we use gatk-4.1.4 instead
-gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-#gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+#GATK claims this error was fixed in 4.1.6, but the fix doesn't work in all cases
+#gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms6000m -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 read_filter_add=MateDifferentStrandReadFilter
 
 [step:split:gatk_combine_gvcfs]
+#combine gvcfs from haplotype caller and gvcfs from our bank for join calling
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -356,10 +409,12 @@ pbs_jobfs=100GB
 modules=java/jdk-13.33,python3-as-python
 cmd_1=$[directories]pipeline/scripts/step_gatkcombinegvcfs.pl
 #there is an error in gatk-4.1.5 rendering GenomicsDBImport useless, we use gatk-4.1.4 instead
+#let's test if it works in 4.1.6...
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-#gatk_bin=$[directories]tools/gatk-4.1.5.0/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
+#gatk_bin=$[directories]tools/gatk-4.1.4.1/gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:split:gatk_genotype_gvcfs]
+#join call the GVCFs
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -371,6 +426,8 @@ cmd_1=$[directories]pipeline/scripts/step_gatkgenotypegvcfs.pl
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xmx4g -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:gatk_vqsr_recal_indel]
+#run VQSR on indels
+#see the params at the end of this section
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -388,12 +445,12 @@ makeplots=false
 tranche=100.0,99.9,99.0,90.0
 #DP should NOT by used for exomes, only for WGS
 annotation=FS,ReadPosRankSum,MQRankSum,QD,SOR
-#annotation=FS,ReadPosRankSum,QD,SOR,DP
-#annotation=QD,DP
 resources=dbsnp,known=true,training=false,truth=false,prior=2 $[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf;mills,known=false,training=true,truth=true,prior=12 $[directories]genome/$[references]gatkbundle/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz;axiomPoly,known=false,training=true,truth=false,prior=10 $[directories]genome/$[references]gatkbundle/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz
 gauss=4,2,1
 
 [step:gatk_vqsr_recal_snp]
+#run VQSR on SNPs
+#see the params at the end of this section
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -415,6 +472,8 @@ resources=dbsnp,known=true,training=false,truth=false,prior=7 $[directories]geno
 gauss=6,4,2,1
 
 [step:split:gatk_vqsr_apply_indel]
+#apply VQSR on indels
+#see the sensitivity cutoff filter at the end of this section - 100 means no filtering
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -430,6 +489,8 @@ tabix_bin=$[tools]tabix
 sensitivity_cutoff=100
 
 [step:split:gatk_vqsr_apply_snp]
+#apply VQSR on SNPs
+#see the sensitivity cutoff filter at the end of this section - 100 means no filtering
 dir=gatk_hc
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -445,6 +506,8 @@ tabix_bin=$[tools]tabix
 sensitivity_cutoff=100
 
 [step:split:varscan_indel]
+#run varscan to call indels
+#see filtering params at the end of this section
 dir=varscan
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -464,6 +527,8 @@ min_var_freq=0.01
 p_value=0.1
 
 [step:split:varscan_snp]
+#run varscan to call SNPs
+#see filtering params at the end of this section
 dir=varscan
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -484,6 +549,8 @@ min_var_freq=0.2
 p_value=0.1
 
 [step:split:strelka]
+#run strelka
+#it uses default params
 dir=strelka
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -500,6 +567,7 @@ bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
 
 [step:split:merge_callers]
+#merge calls from GATK hc, varscan and strelka
 dir=vcf
 pbs_queue=$[global]pbs_queue
 pbs_mem=4GB
@@ -512,6 +580,7 @@ bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
 
 [step:split:vep]
+#run ensembl VEP on final VCF
 dir=vcf
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -531,6 +600,8 @@ cad=$[directories]vep_db/whole_genome_SNVs.tsv.gz
 fasta=$[directories]vep_db/Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz
 
 [step:report_snv]
+#generate short variant report
+#see filter_rd_cvr at the end of this section for read depth filter cutoff
 dir=vcf
 pbs_queue=$[global]pbs_queue
 pbs_mem=16GB
@@ -550,28 +621,8 @@ dbsnp=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp
 #this is the final coverage filter:
 filter_rd_cvr = 5
 
-[step:summary_report]
-dir=report
-pbs_queue=$[global]pbs_queue
-pbs_mem=8GB
-pbs_ncpus=1
-pbs_walltime=01:00:00
-pbs_jobfs=100GB
-modules=java/jdk-13.33,python3-as-python,python3/3.7.4,R/3.6.1
-cmd_1=$[directories]pipeline/scripts/step_summaryreport.pl
-
-[step:gatk_cnv_intervals]
-dir=gatk_cnv
-pbs_queue=$[global]pbs_queue
-pbs_mem=8GB
-pbs_ncpus=1
-pbs_walltime=01:00:00
-pbs_jobfs=100GB
-modules=java/jdk-13.33,python3-as-python
-cmd_1=$[directories]pipeline/scripts/step_gatkcnvintervals.pl
-gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -XX:+UseParallelGC -XX:ParallelGCThreads=4 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
-
 [step:gatk_cnv_read_counts]
+#GATK cnv caller - count reads in intervals
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -583,6 +634,8 @@ cmd_1=$[directories]pipeline/scripts/step_gatkcnvreadcounts.pl
 gatk_bin=$[tools]gatk --java-options "-Djava.io.tmpdir=\$PBS_JOBFS -Xms4000m  -XX:+UseParallelGC -XX:ParallelGCThreads=4 -DGATK_STACKTRACE_ON_USER_EXCEPTION=true"
 
 [step:gatk_cnv_ploidy]
+#GATK cnv caller - call chromosomal ploidy
+#this step uses GATK conda environment
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -597,6 +650,8 @@ contig_ploidy_model=$[directories]genome/GATK_cnv/ploidy_WES-model
 contig_ploidy_calls=$[directories]genome/GATK_cnv/ploidy_WES-calls
 
 [step:split:gatk_cnv_caller]
+#GATK cnv caller - call CNVs
+#this step uses GATK conda environment
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=48GB
@@ -611,6 +666,8 @@ gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/c
 cnv_caller_model=$[directories]genome/GATK_cnv/caller_WES
 
 [step:gatk_cnv_gather_calls]
+#GATK cnv caller - gather CNV calls
+#this step uses GATK conda environment
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=32GB
@@ -624,6 +681,7 @@ gatk_bin=unset PYTHONPATH; source $[directories]tools/miniconda3/etc/profile.d/c
 cnv_caller_model=$[directories]genome/GATK_cnv/caller_WES
 
 [step:report_cnv]
+#generate CNV report 
 dir=gatk_cnv
 pbs_queue=$[global]pbs_queue
 pbs_mem=8GB
@@ -637,7 +695,21 @@ tabix_bin=$[tools]tabix
 vep_bin=$[tools]vep
 fasta=$[directories]vep_db/Homo_sapiens.GRCh38.dna.primary_assembly.fa.bgz
 
+[step:summary_report]
+#summary PDF report AKA 'NATA report'
+dir=report
+pbs_queue=$[global]pbs_queue
+pbs_mem=8GB
+pbs_ncpus=1
+pbs_walltime=01:00:00
+pbs_jobfs=100GB
+modules=java/jdk-13.33,python3-as-python,python3/3.7.4,R/3.6.1
+cmd_1=$[directories]pipeline/scripts/step_summaryreport.pl
+
 [step:archive]
+#archive everything on mdss
+#must be the final step
+#note the mdss_project - it defines the NCI project to use to access mdss
 dir=$[directories]tmp
 pbs_queue=copyq
 pbs_mem=2GB

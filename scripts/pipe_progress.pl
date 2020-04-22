@@ -94,7 +94,7 @@ $Pipeline->get_qjobs;
 
 foreach my $cohort(@cohorts){
 	my $dir_cohort .= "$dir_cohorts/$cohort";
-	warn "progressing cohort '$cohort'\n";
+	warn "\nprogressing cohort '$cohort'\n";
 
 	modules::Exception->throw("Can't access cohort directory $dir_cohort") if(!-d $dir_cohort);
 	#warn "cohort read directory: $dir_cohort\n";

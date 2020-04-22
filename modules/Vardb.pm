@@ -105,11 +105,15 @@ sub request_family_trees{
 	}
 	foreach my $famid (keys %cohorts){
 		#warn "$famid\n";
-		foreach(keys %{$cohorts{$famid}}){
-			#warn " $_\n";
-			if(!defined $self->samples->{$_}){
-				warn "*** WARNING: Individual $_, member of APF family $famid (".join(", ", keys %{$cohorts{$famid}}).") is not present in the input data_file. ***\n";
-				delete $cohorts{$famid}{$_};
+		foreach my $iid(keys %{$cohorts{$famid}}){
+			#warn "$iid = $cohorts{$famid}{$iid}{father} $cohorts{$famid}{$iid}{mother}\n";
+			if(!defined $self->samples->{$iid}){
+				foreach (keys %{$cohorts{$famid}}){
+					$cohorts{$famid}{$_}{father} = 0 if($cohorts{$famid}{$_}{father} eq $iid);
+					$cohorts{$famid}{$_}{mother} = 0 if($cohorts{$famid}{$_}{mother} eq $iid);
+				}
+				warn "*** WARNING: Individual $iid, member of APF family $famid (".join(", ", keys %{$cohorts{$famid}}).") is not present in the input data_file. ***\n";
+				delete $cohorts{$famid}{$iid};
 			}
 		}
 	}
@@ -117,7 +121,7 @@ sub request_family_trees{
 	foreach my $famid (keys %cohorts){
 		warn " $famid\n";
 		foreach(keys %{$cohorts{$famid}}){
-			warn "  $_\n";
+			warn "  $_ father: $cohorts{$famid}{$_}{father} mother: $cohorts{$famid}{$_}{mother}\n";
 		}
 	}
 	$self->{cohorts} = \%cohorts;
@@ -170,7 +174,8 @@ sub get_data_tsv{
 	
 	$self->{dir_ped} = dirname(abs_path($fname));
 	$fqdir = dirname(abs_path($fname)) if(!defined $fqdir);
-		
+	
+	print STDERR "$fname: processing data:\n";
 	open F, "$fname" or modules::Exception->throw("Can't open $fname");
 	my $cnt = 0;
 	while(<F>){
@@ -192,7 +197,7 @@ sub get_data_tsv{
 			my $r2 = $r1;
 			#warn "$r2 =~ s/$read_regex2/$rp/\n";
 			$r2 =~ s/$read_regex2/$rp/;
-			warn "$s[0]\tfastq: $r1, $r2\n";
+			warn " $s[0]\tfastq: $r1, $r2\n";
 			$r1 = "$fqdir/$r1";
 			$r2 = "$fqdir/$r2";
 			modules::Exception->throw("Can not access file $r1") if(!-e $r1);

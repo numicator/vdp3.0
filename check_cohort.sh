@@ -41,9 +41,15 @@ while true; do
 done
 
 if [ -z "$COHORT" ]; then 
-	echo "ERROR: Specify cohort id with argument --cohort <cohort_id>"
+	echo "ERROR: Specify cohort id with argument --cohort <cohort_id>, use --cohort all to check all cohort available"
 	exit
 fi
+if [ "$COHORT" == "all" ]; then
+	COHORT=""
+else
+	COHORT="--cohort $COHORT"
+fi
+
 if [ -z "$SUBMIT" ]; then 
 	echo "INFO: Cohort $COHORT will not be progressed through the pipeline, to submit next unprocessed job(s) use argument --submit"
 	SUBMIT="--no_submit"
@@ -53,7 +59,7 @@ else
 fi
 
 source $DIR/conf/environment.txt
-$DIR/scripts/pipe_progress.pl --cohort $COHORT $SUBMIT
+$DIR/scripts/pipe_progress.pl $COHORT $SUBMIT
 
 if [ $? != 0 ]; then
 	echo "ERROR: something went wrong in pipe_progress.pl script"
