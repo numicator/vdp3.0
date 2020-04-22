@@ -1,0 +1,6 @@
+#ignore genome database:
+GRCh38/
+
+#ignore software tools:
+software/
+
