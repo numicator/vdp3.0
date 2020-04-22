@@ -147,7 +147,7 @@ foreach my $cohort(@cohorts){
 
 
 END{
-	warn "done script ".basename(__FILE__)."\n"
+	warn "\ndone script ".basename(__FILE__)."\n"
 }
 
 
