@@ -190,6 +190,7 @@ sub get_data_tsv{
 			my $rp = $2;
 			$rp =~ s/1/2/;
 			my $r2 = $r1;
+			#warn "$r2 =~ s/$read_regex2/$rp/\n";
 			$r2 =~ s/$read_regex2/$rp/;
 			warn "$s[0]\tfastq: $r1, $r2\n";
 			$r1 = "$fqdir/$r1";

@@ -29,7 +29,7 @@ my $jobid = modules::Utils::pbs_jobid;
 my $me = abs_path($0);
 my $pipe_progress = modules::Utils::scriptdir."/pipe_progress.pl";
 my $r;
-$r = $Syscall->run($pipe_progress);
+$r = $Syscall->run($pipe_progress, 1);
 if($r){
 	warn "\n******************************************************************************************\n";
 	warn "*** WARNING: pipe_shepherd failed to run pipe_progress.pl script. It is bad, check it! ***\n";

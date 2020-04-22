@@ -11,8 +11,8 @@ pbs_other=gdata
 pbs_umask=0007
 pbs_group_list=xx92
 
-read_regex1=.*_R?1_?.*\.f(ast)?q\.gz
-read_regex2=_R?1_?
+read_regex1=.*_R?1[_\.].*\.f(ast)?q\.gz
+read_regex2=_R?1[_\.]
 
 [directories]
 pipeline=/g/data/xx92/$version
