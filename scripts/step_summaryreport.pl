@@ -538,8 +538,10 @@ sub table{
 		#start_y => $pdf->margin_bottom + 710 - $y, 
 		start_y => $y, 
 		next_y  => 780,
-		start_h => 500, 
-		next_h  => 710,
+		#start_h => 500, 
+		start_h => $y - $pdf->margin_bottom,
+		#next_h  => 710,
+		next_h  => 780 - $pdf->margin_bottom,
 		header_props => {
 			font => $pdf->current_font, 
 			font_size => $font_size, 

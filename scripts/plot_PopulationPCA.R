@@ -11,8 +11,8 @@ args <- commandArgs(TRUE)
 bkgfile  <- args[1]
 smplfile <- args[2]
 
-#bkgfile  <- "CCG38_cohort215.background_pca.tsv"
-#smplfile <- "CCG38_cohort215.pca.tsv"
+#bkgfile  <- "ccg_cohort0002.background_pca.tsv"
+#smplfile <- "ccg_cohort0002.pca.tsv"
 
 cat("bkgfile:", bkgfile, "\n")
 cat("smplfile:", smplfile, "\n")
@@ -31,13 +31,14 @@ boxes  <- sapply(nchar(labels), function(n) paste(rep("\U2588", n), collapse = "
 outfile <- gsub(".tsv", ".png", smplfile)
 png(outfile, width = 900, height = 600, units = "px", pointsize = 24)
 
-par(mar = c(0.0, 0, 0, 0))
+par(mfrow = c(1, 1))
+par(mar = c(0, 0, 0, 0))
 par(pty = "m")
 
 pal <- palette(c("red", "blue", "green", "darkviolet", "orange", "gray"))
 opal <- palette(adjustcolor(palette(), alpha.f = 0.25))
 
-plot(bkg$pc1, bkg$pc2, col = bkg$pop, axes = F, xlab = "PC1", ylab = "PC2", pch = 20, cex = 1.2)
+plot(c(bkg$pc1, smpl$pc1), c(bkg$pc2, smpl$pc2), col = bkg$pop, axes = F, xlab = "PC1", ylab = "PC2", pch = 20, cex = 1.2)
 title("PCA Projection of The Cohort onto 1000 Genomes", font.main = 1, cex.main = 1.0, line = -1.5)
 #axis(1, col = "grey", cex.axis = 0.8)
 #axis(2, col = "grey", cex.axis = 0.8)
