@@ -717,4 +717,6 @@ pbs_ncpus=1
 pbs_walltime=10:00:00
 pbs_jobfs=100GB
 mdss_project=u86
+#set run_copy to 1 to archive the run directory ot to 0 to not archive
+run_copy=1
 cmd_1=$[directories]pipeline/scripts/step_archive.pl

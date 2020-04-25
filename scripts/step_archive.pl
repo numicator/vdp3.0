@@ -99,6 +99,7 @@ my $dir_result = $Config->read("directories", "result");
 modules::Exception->throw("Can't access directory $dir_cohort/$dir_result") if(!-d "$dir_cohort/$dir_result");
 
 my $mdss_project = $Config->read("step:$step", "mdss_project");
+my $run_copy = $Config->read("step:$step", "run_copy");
 
 my @cmds;
 
@@ -151,10 +152,15 @@ push @cmds, "mdss -P $mdss_project chmod 660 $dir_mdss/$cohort/qsub.tgz";
 push @cmds, "rm $dir_cohort/qsub.tgz";
 
 #tar and copy run dir
-push @cmds, "cd $dir_cohort; tar cvzf run.tgz $dir_run >&2";
-push @cmds, "mdss -P $mdss_project put $dir_cohort/run.tgz $dir_mdss/$cohort/";
-push @cmds, "mdss -P $mdss_project chmod 660 $dir_mdss/$cohort/run.tgz";
-push @cmds, "rm $dir_cohort/run.tgz";
+if($run_copy){
+	push @cmds, "cd $dir_cohort; tar cvzf run.tgz $dir_run >&2";
+	push @cmds, "mdss -P $mdss_project put $dir_cohort/run.tgz $dir_mdss/$cohort/";
+	push @cmds, "mdss -P $mdss_project chmod 660 $dir_mdss/$cohort/run.tgz";
+	push @cmds, "rm $dir_cohort/run.tgz";
+}
+else{
+	warn "the cohort run directory will not be archived.\n";
+}
 
 #execute commands
 my $r;
