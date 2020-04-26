@@ -122,7 +122,8 @@ if(defined $OPT{data_file}){
 		else{
 			my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles);
 			$Pipeline->set_cohort(cohort => $Cohort);
-			$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
+			#$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
+			$Pipeline->database_record(COHORT_RUN_START);
 			$Cohort->make_workdir($OPT{overwrite}, $OPT{qsub_copy});
 			if(!defined $OPT{qsub_copy}){
 				$Cohort->add_individuals_ped;
@@ -170,7 +171,8 @@ if(defined $OPT{cohort}){
 	foreach(@{$Cohort->individual}){
 		push @individuals, $_->id;
 	}
-	$Pipeline->database_record(COHORT_RUN_START, join(',', sort @individuals)."\t".modules::Utils::username);
+	#$Pipeline->database_record(COHORT_RUN_START, join(',', sort @individuals)."\t".modules::Utils::username);
+	$Pipeline->database_record(COHORT_RUN_START);
 	$Pipeline->get_pipesteps;
 	$Pipeline->make_qsubs(1);
 	$Pipeline->config->reload;

@@ -1,3 +1,6 @@
+#try to ensure that created files and dirs will be available to everybody
+umask 007
+
 #pipeline enivronment definition
 export PERL5LIB="/g/data/xx92/vdp3.0:/g/data/xx92/vdp3.0/software/perl5/lib/perl5"
 export PYTHONPATH="/g/data/xx92/vdp3.0/software/pythonlib/lib/python3.7/site-packages"

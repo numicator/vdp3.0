@@ -62,7 +62,7 @@ sub get_readfiles{
 		$rp =~ s/1/2/;
 		my $r2 = $r1;
 		$r2 =~ s/$read_regex2/$rp/;
-		warn "  read file pair: $r1, $r2\n";
+		#warn "  read file pair: $r1, $r2\n";
 		$r1 = "$dir_indv/$r1";
 		$r2 = "$dir_indv/$r2";
 		modules::Exception->throw("Can't access reads file R2 '$r2', the mate for R1 file '$r1'") if(!-e $r2);

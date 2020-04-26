@@ -6,6 +6,7 @@ use modules::Definitions;
 use modules::Exception;
 use modules::Semaphore;
 use Data::Dumper;
+use File::Copy 'mv';
 
 sub new  
 {
@@ -213,11 +214,7 @@ sub check_current_step{
 		if(! $self->cohort->has_completed){
 			$self->cohort->set_completed;
 			$self->database_lock;
-			my @individuals;
-			foreach(@{$self->cohort->individual}){
-				push @individuals, $_->id;
-			}
-			$self->database_record(COHORT_RUN_DONE, join(',', @individuals)."\t".modules::Utils::username);
+			$self->database_record(COHORT_RUN_DONE);
 			$self->database_unlock;
 		}
 		return($stc, $stn);
@@ -363,10 +360,18 @@ sub database_lastcohort{
 }#database_lastcohort
 
 sub database_record{
-	my($self, $status, $data) = @_;
+	my($self, $status) = @_;
 
 	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
 	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
+	
+	my @individuals;
+	foreach(@{$self->cohort->individual}){
+		push @individuals, $_->id.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfdbid}.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfrequestid};
+	}
+	my $data = join(',', @individuals)."\t".modules::Utils::username;
+	#warn "data: $data\n";
+
 	my $DB;
 	my $record_present = 0;
 	open $DB, $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for reading");
@@ -374,7 +379,7 @@ sub database_record{
 		chomp;
 		my @a = split "\t";
 		if($a[0] eq $self->cohort->id && $a[1] eq $status){
-			warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' already present, no new record will be added\n";
+			warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' already present\n";
 			$record_present = 1;
 			last;
 		}
@@ -385,8 +390,37 @@ sub database_record{
 		$DB->autoflush(1);
 		print $DB $self->cohort->id."\t$status\t".modules::Utils::get_time_stamp."\t$data\n";
 		close $DB;
+		chmod 0660, $self->dbfile; #this will fail if the file is not owned by me, but it's OK, the proper chmod set is only needed (just in case) during new file creation #or modules::Exception->throw("Couldn't chmod 0660 ".$self->dbfile." it is very bad!");
+		warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' added\n";
 	}
 }#database_record
+
+sub database_rm_record{
+	my($self, $status) = @_;
+
+	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
+	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
+	
+	my($DB, $DBT);
+	open $DB, $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile." for reading");
+	open $DBT, ">>", $self->dbfile.'.tmp' or modules::Exception->throw("Couldn't open database file ".$self->dbfile.".tmp for writing");
+	my $rmcnt = 0;
+	while(<$DB>){
+		my @a = split "\t";
+		if($a[0] eq $self->cohort->id && $a[1] eq $status){
+			warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' deleted\n";
+			$rmcnt++;
+			next;
+		}
+		print $DBT $_;
+	}
+	warn "database ".$self->dbfile.": record '".$self->cohort->id." $status' no record found\n" if(!$rmcnt);
+	close $DB;
+	close $DBT;
+	mv($self->dbfile.'.tmp', $self->dbfile)	or modules::Exception->throw("Couldn't move ".$self->dbfile.".tmp to ".$self->dbfile);
+	chmod 0660, $self->dbfile or modules::Exception->throw("Couldn't chmod 0660 ".$self->dbfile." it is very bad!");
+}#database_rm_record
+
 
 sub database_lock{
 	my($self) = shift;
