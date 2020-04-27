@@ -214,7 +214,12 @@ sub check_current_step{
 		if(! $self->cohort->has_completed){
 			$self->cohort->set_completed;
 			$self->database_lock;
-			$self->database_record(COHORT_RUN_DONE);
+			if($self->cohort->private){
+				$self->database_record(COHORT_RUN_DONE);
+			}
+			else{
+				$self->database_record(COHORT_RUN_DONE_PUBLIC);
+			}
 			$self->database_unlock;
 		}
 		return($stc, $stn);

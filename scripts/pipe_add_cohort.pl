@@ -31,6 +31,7 @@ GetOptions(\%OPT,
 	   		"delete",
 	   		"submit",
 	   		"qsub_copy",
+	   		"private",
 	   		"dryrun"
 	   		);
 	   		
@@ -120,7 +121,7 @@ if(defined $OPT{data_file}){
 			warn "*** dryrun - no actuall actions to be performed ***\n";
 		}
 		else{
-			my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles);
+			my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, \%fqfiles, $OPT{private});
 			$Pipeline->set_cohort(cohort => $Cohort);
 			#$Pipeline->database_record(COHORT_RUN_START, join(',', sort keys %{$Vardb->cohorts->{$famid}})."\t".modules::Utils::username);
 			$Pipeline->database_record(COHORT_RUN_START);
@@ -160,7 +161,7 @@ if(defined $OPT{cohort}){
 	modules::Exception->throw("cohort PED file must contain exactly one family") if(scalar keys %{$PED->ped} != 1);
 	modules::Exception->throw("cohort id submited as argument is not the same as cohort id in PED: '$cohort' ne '".(keys %{$PED->ped})[0]."'") if((keys %{$PED->ped})[0] ne $cohort);
 	warn "processing cohort '$cohort'\n";
-	my $Cohort = modules::Cohort->new("$cohort", $Config, $PED);
+	my $Cohort = modules::Cohort->new("$cohort", $Config, $PED, undef, $OPT{private});
 	$Pipeline->set_cohort(cohort => $Cohort);
 	$Cohort->reset_completed if($Cohort->has_completed);
 	$Cohort->make_workdir($OPT{overwrite});

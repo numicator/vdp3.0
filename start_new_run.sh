@@ -9,7 +9,7 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 echo "codebase: $DIR"
 
-OPTS=`getopt -o a --long input:,project:,submit:: -n "$0" -- "$@"`
+OPTS=`getopt -o a --long input:,project:,submit::,private:: -n "$0" -- "$@"`
 #echo "arguments: $OPTS"
 
 if [ $? != 0 ]; then 
@@ -33,6 +33,10 @@ while true; do
 			SUBMIT="--qsub_copy"
 			shift 2
 			;;
+		--private)
+			SUBMIT="$SUBMIT --private"
+			shift 2
+			;;
 		--)
 			shift
 			break
@@ -53,7 +57,7 @@ if [ -z "$PRJ" ]; then
 	exit
 fi
 if [ -z "$SUBMIT" ]; then 
-	echo "INFO: This is onlt a 'dry run', to perform the actuall actions specify argument --submit"
+	echo "INFO: This is onlt a 'dry run', to perform the actuall actions specify argument --submit [--private]"
 	SUBMIT="--dryrun"
 else
 	read -p "Warning: You have specified argument --submit. Should the pipeline be started? (yes/NO): " USRINPUT

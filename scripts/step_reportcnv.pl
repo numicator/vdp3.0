@@ -6,6 +6,7 @@ use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
 use Cwd;
+use Excel::Writer::XLSX;
 use modules::Definitions;
 use modules::SystemCall;
 use modules::Exception;
@@ -190,7 +191,7 @@ $r = $Syscall->run($cmd);
 exit(1) if($r);
 
 warn "running VEP on $dir_run/$cohort.cnv.vcf.gz:\n";
-$cmd = "--force_overwrite --cache --offline --species homo_sapiens --merged --fork 1 --biotype --regulatory --hgvs --numbers --symbol --canonical --flag_pick --vcf --use_transcript_ref --dir $index_dir --fasta $fasta --I $dir_run/$cohort.cnv.vcf.gz --stats_text --stats_file $dir_run/$cohort.cnv.vep_stats.txt -o stdout | $bgzip_bin -c >$dir_run/$cohort.cnv.vep.vcf.gz";
+$cmd = "--force_overwrite --cache --offline --species homo_sapiens --merged --fork 1 --biotype --regulatory --hgvs --numbers --symbol --canonical --flag_pick --pick_order biotype,canonical,rank,appris,tsl,ccds,length,mane --vcf --use_transcript_ref --dir $index_dir --fasta $fasta --I $dir_run/$cohort.cnv.vcf.gz --stats_text --stats_file $dir_run/$cohort.cnv.vep_stats.txt -o stdout | $bgzip_bin -c >$dir_run/$cohort.cnv.vep.vcf.gz";
 $cmd =~ s/\s+-/ \\\n  -/g;
 $cmd = "$vep_bin $cmd";
 $r = $Syscall->run($cmd);
@@ -206,11 +207,22 @@ open I, "$bgzip_bin -dc $dir_run/$cohort.cnv.vep.vcf.gz|" or modules::Exception-
 open O, "| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_all.tsv.gz" or modules::Exception->throw("Can't open '| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_all.tsv.gz' for writing");
 open C, "| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_coding.tsv.gz" or modules::Exception->throw("Can't open '| $bgzip_bin -c >$dir_run/$cohort.cnv.vep_coding.tsv.gz' for writing");
 
+my $wbk_all    = Excel::Writer::XLSX->new("$dir_run/$cohort.cnv.vep_all.xlsx") or modules::Exception->throw("Can't write to '$dir_run/$cohort.cnv.vep_all.xlsx'");
+my $wbk_coding = Excel::Writer::XLSX->new("$dir_run/$cohort.cnv.vep_coding.xlsx") or modules::Exception->throw("Can't write to '$dir_run/$cohort.cnv.vep_coding.xlsx'");
+
+my $wrk_all    = $wbk_all->add_worksheet('SNV_all');
+my $wrk_coding = $wbk_coding->add_worksheet('SNV_coding');
+my $hdr_all    = $wbk_all->add_format(bold => 1);
+my $hdr_coding = $wbk_coding->add_format(bold => 1);
+
 my %vepfld;
 my %sampcln;
 my $header_vep;
 
 my($cnt_coding, $cnt_all) = (0, 0);
+
+my $col = 0;
+my $row = 0;
 
 while(<I>){
 	chomp;
@@ -236,24 +248,46 @@ while(<I>){
 		}
 		print O "chr\tpos\tend\tevent";
 		print C "chr\tpos\tend\tevent";
+		$wrk_all->write($row, $col, 'chr', $hdr_all);
+		$wrk_coding->write($row, $col++, 'chr', $hdr_coding);
+		$wrk_all->write($row, $col, 'pos', $hdr_all);
+		$wrk_coding->write($row, $col++, 'pos', $hdr_coding);
+		$wrk_all->write($row, $col, 'end', $hdr_all);
+		$wrk_coding->write($row, $col++, 'end', $hdr_coding);
+		$wrk_all->write($row, $col, 'event', $hdr_all);
+		$wrk_coding->write($row, $col++, 'event', $hdr_coding);
+		
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-GT";
 			print C "\t$_-GT";
+			$wrk_all->write($row, $col, "$_-GT", $hdr_all);
+			$wrk_coding->write($row, $col++, "$_-GT", $hdr_coding);
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CN";
 			print C "\t$_-CN";
+			$wrk_all->write($row, $col, "$_-CN", $hdr_all);
+			$wrk_coding->write($row, $col++, "$_-CN", $hdr_coding);
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CNQ";
 			print C "\t$_-CNQ";
+			$wrk_all->write($row, $col, "$_-CNQ", $hdr_all);
+			$wrk_coding->write($row, $col++, "$_-CNQ", $hdr_coding);
 		}
 		foreach(sort{$sampcln{$a} <=> $sampcln{$b}} keys %sampcln){
 			print O "\t$_-CNLP";
 			print C "\t$_-CNLP";
+			$wrk_all->write($row, $col, "$_-CNLP", $hdr_all);
+			$wrk_coding->write($row, $col++, "$_-CNLP", $hdr_coding);
 		}
 		print O $header_vep;
 		print C $header_vep;
+		@a = split "\t", $header_vep;
+		for(my $i = 1; $i < scalar @a; $i++){
+			$wrk_all->write($row, $col, $a[$i], $hdr_all);
+			$wrk_coding->write($row, $col++, $a[$i], $hdr_coding);
+		}
 	}
 	next if(/^#/);
 
@@ -297,11 +331,18 @@ while(<I>){
 			$cnt_all++;
 			print O join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
 			print O "\t$csqs[$i]\n";
-			#if((defined $a[$vepfld{Protein_position}] && $a[$vepfld{Protein_position}] ne '') || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
-			if((defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /coding_sequence_variant/) || (defined $a[$vepfld{Consequence}] && $a[$vepfld{Consequence}] =~ /splice_/)){
+			my $inx = 0;
+			foreach($fld[0], $fld[1], $end, $fld[4], @gt, @cn, @cnq, @cnlp, split "\t", $csqs[$i]){
+				$wrk_all->write($cnt_all, $inx++, $_);
+			}
+			if($a[$vepfld{Consequence}] =~ /coding_sequence_variant/){
 				$cnt_coding++;
 				print C join("\t", $fld[0], $fld[1], $end, $fld[4])."\t".join("\t", @gt)."\t".join("\t", @cn)."\t".join("\t", @cnq)."\t".join("\t", @cnlp);
 				print C "\t$csqs[$i]\n";
+				$inx = 0;
+				foreach($fld[0], $fld[1], $end, $fld[4], @gt, @cn, @cnq, @cnlp, split "\t", $csqs[$i]){
+					$wrk_coding->write($cnt_coding, $inx++, $_);
+				}
 			}
 		}
 	}
@@ -310,6 +351,13 @@ close O;
 close C;
 close I;
 warn "printed $cnt_all all loci of which $cnt_coding were coding\n";
+
+$wrk_all->autofilter(0, 0, 0, --$col);
+$wrk_coding->autofilter(0, 0, 0, --$col);
+
+warn "writing XLSX files\n";
+$wbk_all->close();
+$wbk_coding->close();
 
 #idexes of the report tsv files:
 $cmd = "$tabix_bin -f -p bed -S 1 -s 1 -b 2 -e 2 $dir_run/$cohort.cnv.vep_all.tsv.gz";
@@ -332,6 +380,9 @@ modules::Utils::lns("$dir_run/$cohort.cnv.vep_all.tsv.gz.tbi", "$dir_result/$coh
 #TSV report coding, only variants affecting coding sequence - exonic and splice-regions
 modules::Utils::lns("$dir_run/$cohort.cnv.vep_coding.tsv.gz", "$dir_result/$cohort.cnv.vep_coding.tsv.gz");
 modules::Utils::lns("$dir_run/$cohort.cnv.vep_coding.tsv.gz.tbi", "$dir_result/$cohort.cnv.vep_coding.tsv.gz.tbi");
+#XLSX reports all and coding
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_all.xlsx", "$dir_result/$cohort.cnv.vep_all.xlsx");
+modules::Utils::lns("$dir_run/$cohort.cnv.vep_coding.xlsx", "$dir_result/$cohort.cnv.vep_coding.xlsx");
 
 exit(0);
 

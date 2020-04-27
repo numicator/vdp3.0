@@ -6,6 +6,7 @@ use File::Path qw(make_path remove_tree);
 use File::Basename;
 use Pod::Usage;
 use Cwd;
+use Excel::Writer::XLSX;
 use modules::Definitions;
 use modules::SystemCall;
 use modules::Exception;
@@ -136,10 +137,13 @@ my $all_bin = "| $bgzip_bin -c >$dir_run/$cohort.vep_all.tsv.gz";
 my $coding_bin = "| $bgzip_bin -c >$dir_run/$cohort.vep_coding.tsv.gz";
 my $stats_out  = ">$dir_run/$cohort.stats.tsv";
 
+my $all_xlsx = "$dir_run/$cohort.vep_all.xlsx";
+my $coding_xlsx = "$dir_run/$cohort.vep_coding.xlsx";
+
 my $r;
 my $cmd;
 
-warn "creating final TSV reports\n";
+warn "creating final TSV and XLSX reports\n";
 
 open I, "$head_bin" or modules::Exception->throw("Can't do: '$head_bin'");
 
@@ -154,10 +158,11 @@ while(<I>){
 }
 close I;
 
-#use of variables instead of hash for faster access:
+#use variables instead of hash for faster access:
 my $fld_Protein_position   = $fld{Protein_position};
 my $fld_Consequence        = $fld{Consequence};
 my $fld_Existing_variation = $fld{Existing_variation};
+my $fld_BIOTYPE = $fld{BIOTYPE};
 
 my $fld_chr = $fld{chr};
 my $fld_pos = $fld{pos};
@@ -175,20 +180,40 @@ open I, "$sort_bin" or modules::Exception->throw("Can't do: '$sort_bin'");
 open ALL, "$all_bin" or modules::Exception->throw("Can't do: '$all_bin'");
 open CODING, "$coding_bin" or modules::Exception->throw("Can't do: '$coding_bin'");
 
+my $wbk_all    = Excel::Writer::XLSX->new($all_xlsx) or modules::Exception->throw("Can't write to '$all_xlsx'");
+my $wbk_coding = Excel::Writer::XLSX->new($coding_xlsx) or modules::Exception->throw("Can't write to '$coding_xlsx'");
+
+my $wrk_all    = $wbk_all->add_worksheet('SNV_all');
+my $wrk_coding = $wbk_coding->add_worksheet('SNV_coding');
+my $hdr_all    = $wbk_all->add_format(bold => 1);
+my $hdr_coding = $wbk_coding->add_format(bold => 1);
+
 @head = (@head[0..($fld_RD - 1)], "FILTER", @head[$fld_RD..$#head]);
 print ALL join("\t", @head)."\n";
 print CODING join("\t", @head)."\n";
+
+my $col = scalar @head - 1;
+my $row = 0;
+for(my $inx = 0; $inx < scalar @head; $inx++){
+	my $v = $head[$inx];
+	$wrk_all->write($row, $inx, $v, $hdr_all);
+	$wrk_coding->write($row, $inx, $v, $hdr_coding);
+}
 
 my %stats;
 my $posp;
 while(<I>){
 	chomp;
+	$row++;
 	my @a = split "\t";
 
 	my($is_cvrok, $is_snp, $is_known, $is_multi, $is_ti, $is_coding, $caller);
 
 	$is_cvrok  = $a[$fld_RD] >= $filter_rd_cvr? 1: 0;
-	$is_coding = (defined $a[$fld_Protein_position] && $a[$fld_Protein_position] ne '') || (defined $a[$fld_Consequence] && $a[$fld_Consequence] =~ /splice_/)? 1: 0;
+	#********
+	#******** an extremally important and SENSITIVE line below: Identification of coding variants ********
+	#
+	$is_coding = ($a[$fld_Protein_position] ne '' || $a[$fld_Consequence] =~ /splice_/) && $a[$fld_BIOTYPE] =~ /^(((IG)|(TR))_._gene)|(protein_coding)/? 1: 0;
 	
 	#stats are calculated only for filtered variants:
 	if($is_cvrok){
@@ -268,11 +293,27 @@ while(<I>){
 	}#else if($is_cvrok)
 	@a = (@a[0..($fld_RD - 1)], ($is_cvrok? 'ok': "RD_CVR<$filter_rd_cvr"), @a[$fld_RD..$#a]);
 	print ALL join("\t", @a)."\n";
-	print CODING join("\t", @a)."\n" if($is_coding);
+	for(my $inx = 0; $inx < scalar @a; $inx++){
+		my $v = $a[$inx];
+		$wrk_all->write($row, $inx, $v);
+	}
+	if($is_coding){
+		print CODING join("\t", @a)."\n";
+		for(my $inx = 0; $inx < scalar @a; $inx++){
+			my $v = $a[$inx];
+			$wrk_coding->write($row, $inx, $v);
+		}
+	}
 }#while(<I>)
 close ALL;
 close CODING;
 close I;
+$wrk_all->autofilter(0, 0, 0, $col);
+$wrk_coding->autofilter(0, 0, 0, $col);
+
+warn "writing XLSX files\n";
+$wbk_all->close();
+$wbk_coding->close();
 
 open STATS, "$stats_out" or modules::Exception->throw("Can't do: '$stats_out'");
 print STATS join("\t", sort keys %stats)."\n";
@@ -390,6 +431,9 @@ modules::Utils::lns("$dir_run/$cohort.vep_all.tsv.gz.tbi", "$dir_result/$cohort.
 #TSV report coding, only variants affecting coding sequence - exonic and splice-regions
 modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz", "$dir_result/$cohort.vep_coding.tsv.gz");
 modules::Utils::lns("$dir_run/$cohort.vep_coding.tsv.gz.tbi", "$dir_result/$cohort.vep_coding.tsv.gz.tbi");
+#XLSX all and coding reports
+modules::Utils::lns("$dir_run/$cohort.vep_all.xlsx", "$dir_result/$cohort.vep_all.xlsx");
+modules::Utils::lns("$dir_run/$cohort.vep_coding.xlsx", "$dir_result/$cohort.vep_coding.xlsx");
 
 exit(0);
 

@@ -111,6 +111,7 @@ cpanm Module::Install
 cpanm PDF::API2
 cpanm PDF::API2::Simple
 cpanm PDF::Table
+cpanm Excel::Writer::XLSX
 
 #installation script will need to have bgzip and tabix in search path
 ./INSTALL.pl --CACHEDIR /g/data/xx92/vdp3.0/GRCh38/vep_index/ --CONVERT --CACHEURL /g/data/xx92/vdp3.0/software/homo_sapiens/ --FASTAURL /g/data/xx92/vdp3.0/software/homo_sapiens/

@@ -33,9 +33,10 @@ BEGIN{
 		
 		LOCK_MAX_AGE     => 600, #max age of lock file in seconds before lock file considered 'stale' and the lock can be overrided
 		
-		COHORT_RUN_START     => 'START',      #log entry in the the pipeline db
-		COHORT_RUN_DONE      => 'DONE',       #log entry in the the pipeline db
-		COHORT_RUN_PUBLISHED => 'PUBLISHED',  #log entry in the the pipeline db
+		COHORT_RUN_START       => 'START',        #log entry in the the pipeline db
+		COHORT_RUN_DONE        => 'DONE',         #log entry in the the pipeline db
+		COHORT_RUN_DONE_PUBLIC => 'DONE_PUBLIC',  #log entry in the the pipeline db
+		COHORT_RUN_PUBLISHED   => 'PUBLISHED',    #log entry in the the pipeline db
 		
 		TIMESTAMP => '%d-%m-%Y_%H:%M:%S' #time stamp format in all pipeline loging
 	);

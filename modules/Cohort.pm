@@ -12,12 +12,13 @@ use modules::SystemCall;
 use Data::Dumper;
 
 sub new{
-	my($class, $id, $config, $ped, $fqfiles) = @_;
+	my($class, $id, $config, $ped, $fqfiles, $private) = @_;
 	my $self = bless {}, $class;
 	$self->{id}     = $id;
 	$self->{config} = $config;
 	$self->{ped}    = $ped;
-	$self->{fqfiles}  = $fqfiles;
+	$self->{fqfiles}= $fqfiles;
+	$self->{private}= defined $private? 1: 0; 
 	return $self;
 }
 
@@ -25,6 +26,11 @@ sub id{
 	my($self) = shift;
 	return $self->{id};
 }#id
+
+sub private{
+	my($self) = shift;
+	return $self->{private};
+}#private
 
 sub ped{
 	my($self) = shift;
@@ -159,7 +165,7 @@ sub make_workdir{
 	$config->reload("$dir_work/$cohort/$cfn");
 	$self->config->file_append("\n#".('*'x20)." Cohort $cohort configuration ".('*'x20));
 	$self->config->file_append("[cohort]");
-	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort\nusername=$username\ntime_start=$tstamp");
+	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort\nusername=$username\ntime_start=$tstamp\nprivate=".$self->private."\n");
 	$config->reload("$dir_work/$cohort/$cfn");
 	
 	#copy PEDX file and make regular PED file:
@@ -285,6 +291,8 @@ sub add_individuals_ped{
 		#$self->ped->ped->{$self->id}{$indv}{capturekit}
 		#$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort");
 	}
+	$self->{private} = $self->config->read("cohort", "private");
+
 }#add_individuals_ped
 
 #sub get_pipesteps{
