@@ -364,6 +364,23 @@ sub database_lastcohort{
 	return $id;
 }#database_lastcohort
 
+sub database_cohort_by_status{
+	my($self, $status) = @_;
+	my @ids;
+	
+	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
+	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
+	my $DB;
+	open $DB, $self->dbfile or modules::Exception->throw("Couldn't open database file ".$self->dbfile);
+	while(<$DB>){
+		chomp;
+		my @a = split "\t";
+		push @ids, [@a] if($a[1] eq $status);
+	}
+	close $DB;
+	return \@ids;
+}#database_cohort_by_status
+
 sub database_record{
 	my($self, $status) = @_;
 
