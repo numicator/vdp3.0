@@ -98,8 +98,6 @@ my $dir_result = $dir_cohort.'/'.$Config->read("directories", "result");
 modules::Exception->throw("Can't access cohort run directory $dir_result") if(!-d $dir_result);
 my $dir_tmp = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("directories", "tmp");
 modules::Exception->throw("Can't access cohort run TEMP directory $dir_tmp") if(!-d $dir_tmp);
-my $dir_interval = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_intervals", "dir");
-modules::Exception->throw("Can't access cohort run directory $dir_interval") if(!-d $dir_interval);
 my $dir_readcount = $dir_cohort.'/'.$Config->read("directories", "run").'/'.$Config->read("step:gatk_cnv_read_counts", "dir");
 modules::Exception->throw("Can't access cohort run directory $dir_readcount") if(!-d $dir_readcount);
 
@@ -116,15 +114,6 @@ $Cohort->add_individuals_ped();
 my $reference = $Config->read("references", "genome_fasta");
 my $model     = $Config->read("step:$step", "contig_ploidy_model");
 my $cmd       = $Config->read("step:$step", "gatk_bin");
-
-#my @files;
-#foreach(sort @{$Cohort->individual}){
-#	my $indv = $_->id;
-#	my $f = "$dir_readcount/$cohort-$indv.tsv";
-#	modules::Exception->throw("Can't access file '$f'") if(!-e $f);
-#	modules::Exception->throw("File '$f' is empty") if(!-s $f);
-#	push @files, $f;
-#}
 
 my $r;
 $cmd .= " DetermineGermlineContigPloidy --tmp-dir $dir_tmp --model $model --output $dir_run --output-prefix $cohort-$individual\_ploidy -I $dir_readcount/$cohort-$individual.tsv";

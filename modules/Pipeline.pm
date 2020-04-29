@@ -387,11 +387,19 @@ sub database_record{
 	modules::Exception->throw("property dbfile not defined in object Pipeline") if(!defined $self->dbfile);
 	modules::Exception->throw("pipeline database must be locked before access") if(!defined $self->{semaphore});
 	
-	my @individuals;
-	foreach(@{$self->cohort->individual}){
-		push @individuals, $_->id.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfdbid}.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfrequestid};
+	my $data;
+	#during the cohort init stage the individual are not exactly know, actually they are... but the pipe_add_cohort.pl works in a way that it assigns them in the start stage after init
+	#(start is after the cp_fastq qsub finishes, init is before it even starts) 
+	if($status ne COHORT_RUN_INIT){
+		my @individuals;
+		foreach(@{$self->cohort->individual}){
+			push @individuals, $_->id.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfdbid}.':'.$self->cohort->ped->ped->{$self->cohort->id}{$_->id}{apfrequestid};
+		}
+		$data = join(',', @individuals)."\t".modules::Utils::username;
 	}
-	my $data = join(',', @individuals)."\t".modules::Utils::username;
+	else{
+		$data = "\t".modules::Utils::username;
+	}
 	#warn "data: $data\n";
 
 	my $DB;

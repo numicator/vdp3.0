@@ -519,7 +519,7 @@ cmd_1=$[directories]pipeline/scripts/step_varscan.pl --fun call --mode INDEL
 varscan_bin=$[tools]varscan
 bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
-
+#calling filters:
 min_coverage=8
 min_reads2=2
 min_avg_qual=15
@@ -541,7 +541,7 @@ varscan_bin=$[tools]varscan
 bgzip_bin=$[tools]bgzip
 tabix_bin=$[tools]tabix
 bcftools_bin=$[tools]bcftools
-
+#calling filters:
 min_coverage=8
 min_reads2=5
 min_avg_qual=15
@@ -618,7 +618,7 @@ peddy_bin=$[tools]peddy
 pcaplot_bin=Rscript $[directories]pipeline/scripts/plot_PopulationPCA.R
 peddy_dir=peddy
 dbsnp=$[directories]genome/$[references]gatkbundle/Homo_sapiens_assembly38.dbsnp138.vcf
-#this is the final coverage filter:
+#this is the final, reporting coverage filter:
 filter_rd_cvr = 5
 
 [step:gatk_cnv_read_counts]

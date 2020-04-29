@@ -266,10 +266,10 @@ sub load_ped{
 }#load_ped
 
 sub add_individual{
-	my($self, $id) = @_;
+	my($self, $id, $readfiles_skip) = @_;
 	my $i = modules::Individual->new($id, $self);
 	push @{$self->{individual}}, $i;
-	$i->get_readfiles();
+	$i->get_readfiles() if(!$readfiles_skip);
 }#add_individual
 
 sub config_add_readfiles{
@@ -283,11 +283,11 @@ sub config_add_readfiles{
 }#config_add_readfiles
 
 sub add_individuals_ped{
-	my($self, $overwrite) = @_;
+	my($self, $overwrite, $readfiles_skip) = @_;
 	
 	foreach my $indv(keys %{$self->ped->ped->{$self->id}}){
 		#warn "$indv\n";
-		$self->add_individual($indv);
+		$self->add_individual($indv, $readfiles_skip);
 		#$self->ped->ped->{$self->id}{$indv}{capturekit}
 		#$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort");
 	}

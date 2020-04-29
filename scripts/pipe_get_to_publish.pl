@@ -81,7 +81,6 @@ if(defined $OPT{published}){
 	foreach(@{$Pipeline->database_cohort_by_status(COHORT_RUN_PUBLISHED)}){
 		print join("\t", @$_)."\n"
 	}
-
 }
 else{
 	warn "ids of cohorts to publish\n";
