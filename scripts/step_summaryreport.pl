@@ -155,7 +155,7 @@ foreach my $indv(@indv_id){
 	$fid = '-' if(!defined $fid || $fid eq '0' || $fid eq '-9' || $fid eq '');
 	$mid = '-' if(!defined $mid || $mid eq '0' || $mid eq '-9' || $mid eq '');
 	$aff = $aff eq '2'? 'Y': 'N';
-	$sex = $sex eq '2'? 'F': 'M';
+	$sex = $sex eq '2'? 'F': $sex eq '1'? 'M': 'U';
 	$seq = 'UNKNOWN' if(!defined $seq);
 	
 	$indv_data{$indv}{sex_ped} = $sex;
@@ -370,7 +370,7 @@ foreach my $indv(@indv_id){
 	
 	my $data = [
 		["INDIVIDUAL $indv", ''.($indv_data{$indv}{affected} eq 'Y'? '': 'UN').'AFFECTED'],
-		["Sex", ($indv_data{$indv}{sex_ped} eq 'M'? 'Male': 'Female')."   confirmed: ".$indv_data{$indv}{sex_ok}."   (heterozygosity of chrX: ".sprintf("%.2f",$indv_data{$indv}{x_het_ratio}).")"],
+		["Sex", ($indv_data{$indv}{sex_ped} eq 'M'? 'Male': $indv_data{$indv}{sex_ped} eq 'F'? 'Female': 'Unknow')."   confirmed: ".$indv_data{$indv}{sex_ok}."   (heterozygosity of chrX: ".sprintf("%.2f",$indv_data{$indv}{x_het_ratio}).")"],
 		["Ancestry", $indv_data{$indv}{ancestry}."   (prediction probability: ".$indv_data{$indv}{ancestry_prob}.")"],
 		["Mother", $indv_data{$indv}{mother}.($indv_data{$indv}{mother} eq '-'? '': "   confirmed: ".$pedigree{$indv}{$indv_data{$indv}{mother}}{rel_ok}. "   (rel. expected: ".$pedigree{$indv}{$indv_data{$indv}{mother}}{rel_expected}.", calculated: ".sprintf("%.2f",$pedigree{$indv}{$indv_data{$indv}{mother}}{rel_calculated}).")")],
 		["Father", $indv_data{$indv}{father}.($indv_data{$indv}{father} eq '-'? '': "   confirmed: ".$pedigree{$indv}{$indv_data{$indv}{father}}{rel_ok}. "   (rel. expected: ".$pedigree{$indv}{$indv_data{$indv}{father}}{rel_expected}.", calculated: ".sprintf("%.2f",$pedigree{$indv}{$indv_data{$indv}{father}}{rel_calculated}).")")],

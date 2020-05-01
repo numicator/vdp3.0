@@ -34,7 +34,7 @@ while true; do
 			shift 2
 			;;
 		--private)
-			SUBMIT="$SUBMIT --private"
+			PRIVATE="--private"
 			shift 2
 			;;
 		--)
@@ -70,7 +70,7 @@ else
 fi
 
 source $DIR/conf/environment.txt
-$DIR/scripts/pipe_add_cohort.pl --data_file $INPUT --project $PRJ $SUBMIT
+$DIR/scripts/pipe_add_cohort.pl --data_file $INPUT --project $PRJ $SUBMIT $PRIVATE
 
 if [ $? != 0 ]; then
 	echo "ERROR: something went wrong in pipe_add_cohort.pl script"

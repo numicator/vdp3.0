@@ -86,7 +86,7 @@ sub request_family_tree{
 		$self->{samples}{$indv_id}{famid} = $indv[$h{FamilyId}];
 		
 		#comment out below to allow for samples with unknow sex:
-		modules::Exception->throw("Gender of individual ".$indv[$h{IndividualName}]." has not been set in APF VariantDb (".$indv[$h{Gender}].")") if($fam{$indv[$h{FamilyId}]}{$iid}{sex} == -9);
+		#modules::Exception->throw("Gender of individual ".$indv[$h{IndividualName}]." has not been set in APF VariantDb (".$indv[$h{Gender}].")") if($fam{$indv[$h{FamilyId}]}{$iid}{sex} == -9);
 	}
 	return \%fam;
 }#requestFamilyTree
