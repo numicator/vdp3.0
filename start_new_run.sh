@@ -57,7 +57,7 @@ if [ -z "$PRJ" ]; then
 	exit
 fi
 if [ -z "$SUBMIT" ]; then 
-	echo "INFO: This is onlt a 'dry run', to perform the actuall actions specify argument --submit [--private]"
+	echo "INFO: This is only a 'dry run', to perform the actuall actions specify argument --submit [--private]"
 	SUBMIT="--dryrun"
 else
 	read -p "Warning: You have specified argument --submit. Should the pipeline be started? (yes/NO): " USRINPUT

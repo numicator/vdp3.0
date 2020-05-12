@@ -114,7 +114,7 @@ dir=pipe_shepherd
 pbs_queue=$[global]pbs_queue
 pbs_mem=2GB
 pbs_ncpus=1
-pbs_walltime=1:00:00
+pbs_walltime=3:00:00
 
 [cp_fastq]
 #particulars of the jobs to copy fastq files

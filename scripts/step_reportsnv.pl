@@ -194,10 +194,12 @@ print CODING join("\t", @head)."\n";
 
 my $col = scalar @head - 1;
 my $row = 0;
+my $row_coding = 0;
+
 for(my $inx = 0; $inx < scalar @head; $inx++){
 	my $v = $head[$inx];
 	$wrk_all->write($row, $inx, $v, $hdr_all);
-	$wrk_coding->write($row, $inx, $v, $hdr_coding);
+	$wrk_coding->write($row_coding, $inx, $v, $hdr_coding);
 }
 
 my %stats;
@@ -299,9 +301,10 @@ while(<I>){
 	}
 	if($is_coding){
 		print CODING join("\t", @a)."\n";
+		$row_coding++;
 		for(my $inx = 0; $inx < scalar @a; $inx++){
 			my $v = $a[$inx];
-			$wrk_coding->write($row, $inx, $v);
+			$wrk_coding->write($row_coding, $inx, $v);
 		}
 	}
 }#while(<I>)

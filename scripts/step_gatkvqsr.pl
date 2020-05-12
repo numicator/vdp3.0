@@ -168,8 +168,13 @@ sub recal{
 		}
 	}
 	exit(1) if($r); #exit with $r would be tricky as bash sees only 8 bits, instead of converting we just return 1
+	
+	my $cmd = "gzip -t $dir_run/$cohort.$mode.recall.all.vcf.gz";
+	$r = $Syscall->run($cmd);
+	exit(1) if($r);
+	
 	if($makeplots eq 'true'){
-		my $cmd = "$plots_bin $dir_run/$cohort.$mode.all.tranches";
+		$cmd = "$plots_bin $dir_run/$cohort.$mode.all.tranches";
 		$r = $Syscall->run($cmd, 1);
 		exit(1) if($r);
 	}
@@ -206,6 +211,11 @@ sub apply{
 	#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 	$r = $Syscall->run($cmd);
 	exit(1) if($r);
+
+	$cmd = "gzip -t $fo";
+	$r = $Syscall->run($cmd);
+	exit(1) if($r);
+
 	$cmd = "$tabix -f $fo";
 	$r = $Syscall->run($cmd);
 	exit(1) if($r);
@@ -217,6 +227,9 @@ sub apply{
 		$cmdx =~ s/\s+-/ \\\n  -/g;
 		$cmd .= $cmdx;
 		#warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
+		$r = $Syscall->run($cmd);
+		exit(1) if($r);
+		$cmd = "gzip -t $dir_run/$cohort.$split.vqsr.vcf.gz";
 		$r = $Syscall->run($cmd);
 		exit(1) if($r);
 	}

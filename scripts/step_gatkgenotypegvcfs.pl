@@ -135,6 +135,11 @@ $cmdx = "$cmd $cmdx";
 $r = $Syscall->run($cmdx);
 exit(1) if($r);
 
+$cmd = "gzip -t $dir_run/$cohort.$split.vcf.gz";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
+
 exit(0);
 END{
 	warn "done script ".basename(__FILE__)."\n"

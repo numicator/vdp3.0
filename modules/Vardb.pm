@@ -57,10 +57,17 @@ sub request_family_tree{
 		my @indv = split '\|', $_;
 		#print STDERR "   $_";
 
-		#awfully irritating: deal with multiple sample names, keep only the name provided in the tsv file:
 		my $iid = $indv[$h{IndividualName}];
 		my $fid = $indv[$h{FatherName}];
 		my $mid = $indv[$h{MotherName}];
+		
+		#awfully irritating: sample names may have spaces, eg. 'Father of TCH336', we need to deal with it:
+		#samples with spaces names are _normaly_ 'aritificial' and will not be used in analyses anyway
+		$iid =~ s/s+/_/g;
+		$fid =~ s/s+/_/g;
+		$mid =~ s/s+/_/g;
+		
+		#awfully irritating: deal with multiple sample names, keep only the name provided in the tsv file:
 		foreach my $smpl(keys %{$self->samples}){
 			$iid = $1 if($iid =~ /\b($smpl)\b/); #\b is a word break to avoid matching eg. CCG21 with CCG213
 			$fid = $1 if($fid =~ /\b($smpl)\b/);

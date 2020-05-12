@@ -122,6 +122,11 @@ $cmd .= $cmdx;
 #warn "$cmd\n"; exit(PIPE_NO_PROGRESS);
 my $r = $Syscall->run($cmd);
 exit(1) if($r);
+
+$cmd = "gzip -t $dir_run/$cohort-$individual.$split.g.vcf.gz";
+$r = $Syscall->run($cmd);
+exit(1) if($r);
+
 exit(0);
 
 END{
