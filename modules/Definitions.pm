@@ -25,7 +25,7 @@ BEGIN{
 		QJOB_ONHOLD   => 5,
 		QJOB_NOSTATUS => 99,
 
-		JOB_MAX_RERUNS => 5,    #max numbers of step runs (executions) before step is considered dead
+		JOB_MAX_RERUNS => 6,    #max numbers of step runs (executions) before step is considered dead
 		JOB_MAX_RESUB  => 10,   #max numbers of step submissions before step is considered dead
 		
 		PIPE_STOP        => 88, #error code recognized as request to stop the pipeline

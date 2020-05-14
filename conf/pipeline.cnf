@@ -81,7 +81,8 @@ gatk=$[directories]tools/gatk-4.1.6.0/gatk
 
 varscan=java -Djava.io.tmpdir=\$PBS_JOBFS -DGATK_STACKTRACE_ON_USER_EXCEPTION=true -Xms4000m -jar $[directories]tools/VarScan.v2.4.4.jar
 strelka=$[directories]tools/strelka-2.9.10/bin
-vep=$[directories]tools/ensembl-vep-release-99.2/vep
+#vep=$[directories]tools/ensembl-vep-release-99.2/vep
+vep=$[directories]tools/ensembl-vep-release-100.0/vep
 peddy=export PYTHONPATH="\$PYTHONPATH:$[directories]tools/peddy"; python3.7 -m peddy
 
 [tool_versions]
@@ -95,14 +96,16 @@ BCFTools=$[tools]bcftools 2>&1 | grep Version: | awk '{print \$2}'
 GATK=$[tools]gatk --version 2>/dev/null | grep 'The Genome Analysis Toolkit' | awk '{print \$NF}'
 VarScan=$[tools]varscan 2>&1 | grep VarScan | head -n 1 | awk '{print \$2}'
 Strelka=echo '2.9.10'
-Ensembl_VEP=echo '99.2'
+#Ensembl_VEP=echo '99.2'
+Ensembl_VEP=echo '100.0'
 peddy=$[tools]peddy --version 2>/dev/null | awk '{print \$NF}'
 
 [db_versions]
 #versions of the databases, must be corrected manually when updating databases
 Genome_Reference=Homo Sampiens GRCh38
 GATK_bundle=hg38/v0
-Ensembl_VEP=99_GRCh38
+#Ensembl_VEP=99_GRCh38
+Ensembl_VEP=100_GRCh38
 GnomAD=3.0
 CADD=v1.5
 ClinVar=2020.03.10

@@ -166,6 +166,7 @@ sub make_workdir{
 	$self->config->file_append("\n#".('*'x20)." Cohort $cohort configuration ".('*'x20));
 	$self->config->file_append("[cohort]");
 	$self->config->file_append("id=$cohort\ndir=$dir_work/$cohort\nusername=$username\ntime_start=$tstamp\nprivate=".$self->private."\n");
+	die "*** private is: ".$self->private." ***\n";
 	$config->reload("$dir_work/$cohort/$cfn");
 	
 	#copy PEDX file and make regular PED file:
